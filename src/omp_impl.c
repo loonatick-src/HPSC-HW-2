@@ -1,5 +1,7 @@
 #include "dbg.h"
 #include "omp_impl.h"
+
+#include <inttypes.h>
 #include <omp.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -36,7 +38,7 @@ int
 matMulSquare_transpose(const double *M_1,
                        const double *M_2,
                        double *P,
-                       const uint32_t width)
+                       uint32_t width)
 {
     // transposing the second matrix
     // fewer cache misses
@@ -50,7 +52,7 @@ matMulSquare_transpose(const double *M_1,
 
     // 1m
     M_2trnsps = (double *) malloc(mem_size);
-    mem_check(M_2trnsps);
+    check_mem(M_2trnsps);
 
     // parallelized matrix transposition
     for (uint32_t row = 0; row < width; row++ )
@@ -74,9 +76,9 @@ matMulSquare_transpose(const double *M_1,
             for (uint32_t i = 0; i < width; i++)
             {
                 const uint32_t index = row * width + i;
-                sum += M_1[index] * M_2trnsps[index];
+                elmt_sum += M_1[index] * M_2trnsps[index];
             }
-            P[i_p] = sum;
+            P[i_p] = elmt_sum;
         }
     }
 
@@ -94,4 +96,7 @@ int
 matMulSquare_pretranspose(const double *M_1,
                           const double *M_2,
                           double *P,
-                          const uint32_t width);
+                          uint32_t width)
+{
+    return 1;
+}

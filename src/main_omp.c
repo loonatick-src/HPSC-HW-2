@@ -10,7 +10,8 @@
 #include <string.h>
 
 
-typedef ((int)(*)(const double *, const double *, double *, const uint32_t)) implementation_t;
+typedef int (*implementation_t)(const double *, const double *, double *, uint32_t);
+
 
 typedef struct {
     char lmat_flag;
@@ -19,7 +20,9 @@ typedef struct {
     char thread_flag;
 } flags_t;
 
-flags_t input_flags = { NULL };
+
+flags_t input_flags = { 0, 0, 0, 0 };
+
 
 const implementation_t implementations[] = {
     matMulSquare_baseline,
@@ -39,7 +42,7 @@ struct option longopts[] = {
     { "rpath", required_argument, NULL, 'r'},
     { "threadcount", required_argument, NULL, 't'},
     { 0 }
-}
+};
 
 
 
@@ -81,10 +84,11 @@ main(int argc, char *argv[])
         usage(stderr, argv[0]);
         goto error;
     }
+    debug("Processing inputs");
     while(1)
     {
-        int opt = getopt_long(argc, argv, "hl:r:t:", longopts, 0);
-
+        int opt = getopt_long(argc, argv, "hl:r:t:w:i:", longopts, 0);
+        int index;
         if (opt == -1) break;
 
         switch(opt)
@@ -94,9 +98,11 @@ main(int argc, char *argv[])
                 break;
             case('w'):
                 widthi = atoi(optarg);
+                input_flags.w_flag = 1;
+                debug("Setting width to %d", widthi);
                 break;
             case('i'):
-                int index = atoi(optarg);
+                index = atoi(optarg);
                 if (index < 1 || index > num_impl)
                 {
                     log_err("Argument for selecting implementations must be an integer in 1..=%d", num_impl);
@@ -104,25 +110,30 @@ main(int argc, char *argv[])
                     break;
                 }
                 mulfunc = implementations[index-1];
+                debug("Using implementation number %d", index);
                 impl_flag = 1;
-
+                break;
             case('l'):
                 input_flags.lmat_flag = 1;
                 strncpy(m1_path, optarg, sizeof(m1_file));
                 m1_path[sizeof(m1_file) - 1] = '\0';
+                debug("Left matrix filename: %s", m1_path);
                 break;
             case('r'):
                 strncpy(m2_path, optarg, sizeof(m2_file));
                 m2_path[sizeof(m2_path) - 1] = '\0';
                 input_flags.rmat_flag = 1;
+                debug("Right matrix file name: %s", m2_path);
                 break;
             case('t'):
                 // no return value, I hope that its error handling is robust
                 input_flags.thread_flag = 1;
+                debug("Setting number of threads to %d", atoi(optarg));
                 omp_set_num_threads(atoi(optarg));
                 break;
             case('?'):
                 help_flag = 1;
+                debug("Malformed argument?");
                 break;
             default:
                 break;
@@ -138,14 +149,16 @@ main(int argc, char *argv[])
     if (we_should_print_usage)
     {
         usage(stderr, argv[0]);
-        goto error:
+        goto error;
     }
+    debug("input processed successfully");
 
 
     // all matrices width x width
     check(widthi > 0, "Width of matrices must be a postive integer\
             (provided value: %d", widthi);
     const uint32_t width = (uint32_t) widthi;
+    debug("Setting width to %u", width);
 
     // number of elements per matrix
     const uint32_t matsize = width * width;
@@ -161,20 +174,24 @@ main(int argc, char *argv[])
 
     // malloc
     // 1m
+    debug("Allocating memory to M1");
     M_1 = (double *) malloc(mem_size);
     check_mem(M_1);
 
     // 2m
+    debug("Allocating memory to M2");
     M_2 = (double *) malloc(mem_size);
     check_mem(M_2);
 
     // 3m
+    debug("Allocating memory to P");
     P = (double *) malloc(mem_size);
     check_mem(P);
 
 
     // reading matrix elements from file
     m1_file = fopen(m1_path, "r");
+    debug("Opening file for reading M1");
 
     uint32_t in_count = 0;
     double melmnt;
@@ -190,6 +207,7 @@ main(int argc, char *argv[])
         in_count++;
     }
     fclose(m1_file);
+    debug("M1 read complete. Moving on to M2");
 
     m2_file = fopen(m2_path, "r");
     in_count = 0;
@@ -205,18 +223,23 @@ main(int argc, char *argv[])
         in_count++;
     }
     fclose(m2_file);
+    debug("M2 read complete");
 
 
+    debug("Performing matrix multiplication");
     int my_err = mulfunc(M_1, M_2, P, width);
     check(my_err, "Something went wrong during matrix multiplication");
+
+    debug("Returned from matrix multiplication");
+    debug("Printing product matrix to stdout");
     for (int row = 0; row < width; row++)
     {
         int skip = width * row;
         for (int col = 0; col < width-1; col++)
         {
-            printf("%d ", P[skip + col]);
+            printf("%lf ", P[skip + col]);
         }
-        printf("%d\n", P[skip + width-1]);
+        printf("%lf\n", P[skip + width-1]);
     }
 
      

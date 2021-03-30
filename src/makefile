@@ -1,8 +1,13 @@
 CC=gcc
 MC=mpicc
-CFLAGS=-Wall -pedantic
+CFLAGS=-Wall -Winline -pedantic  
 OMPFLAGS=-fopenmp
+DBGFLAGS=-g
 
-omp: omp.c
-	$(CC) $(CFLAGS) $(OMPFLAGS) omp.c -o omp.o
+omp: main_omp.c omp_impl.o
+	$(CC) $(CFLAGS) $(OMPFLAGS) main_omp.c omp_impl.o -o omp.out
+
+omp_impl.o: omp_impl.c
+	$(CC) $(CFLAGS) $(OMPFLAGS) -c omp_impl.c
+
 

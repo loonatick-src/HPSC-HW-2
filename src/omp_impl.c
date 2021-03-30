@@ -5,9 +5,9 @@
 #include <stdlib.h>
 
 
-void
-matMulSquare_baseline(const double * const M_1,
-                      const double * const M_2,
+int
+matMulSquare_baseline(const double *M_1,
+                      const double *M_2,
                       double *P, 
                       const uint32_t width) 
 {
@@ -27,25 +27,32 @@ matMulSquare_baseline(const double * const M_1,
             P[i_p] = elmt_sum;
         }
     }
+
+    return 0;
 }
 
 
 int
-matMulSquare_transpose(const double * const M_1,
-                       const double * const M_2,
+matMulSquare_transpose(const double *M_1,
+                       const double *M_2,
                        double *P,
                        const uint32_t width)
 {
+    // transposing the second matrix
+    // fewer cache misses
+    // large overhead of transposition
     double *M_2trnsps = NULL;
     const uint32_t matrix_size = width * width;
     check(matrix_size >= width, "Integer overflow (uint32_t).");
 
-    const unsigned long int mem_size = matrix_size * sizeof(uint32_t);
+    const unsigned long int mem_size = matrix_size * sizeof(double);
     check(mem_size >= matrix_size, "Integer overflow when calculating size to be malloc'd");
 
+    // 1m
     M_2trnsps = (double *) malloc(mem_size);
     mem_check(M_2trnsps);
 
+    // parallelized matrix transposition
     for (uint32_t row = 0; row < width; row++ )
     {
 #       pragma omp parallel for
@@ -55,6 +62,8 @@ matMulSquare_transpose(const double * const M_1,
         }
     }
 
+    // matrix multiplication, taking into account transposition
+    // of M_2
     for (uint32_t row = 0; row < width; row++) 
     {
         for (uint32_t col = 0; col < width; col++)
@@ -71,7 +80,7 @@ matMulSquare_transpose(const double * const M_1,
         }
     }
 
-    free(M_2trnsps);
+    free(M_2trnsps);   // 1m
     return 0;
 
 error:
@@ -79,3 +88,10 @@ error:
         free(M_2trnsps);
     return -1;
 }
+
+
+int
+matMulSquare_pretranspose(const double *M_1,
+                          const double *M_2,
+                          double *P,
+                          const uint32_t width);

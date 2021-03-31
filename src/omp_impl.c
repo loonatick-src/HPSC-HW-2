@@ -13,6 +13,10 @@ matMulSquare_baseline(const double *M_1,
                       double *P, 
                       const uint32_t width) 
 {
+    debug("Performing matrix multiplication for %d x %d matrices", width, width);
+    const uint32_t matrix_size = width * width;
+    check(matrix_size >= width, "Integer overflow (uint32_t).");
+    debug("%u %u", width, matrix_size);
     for (uint32_t row = 0; row < width; row++)
     {
         for (uint32_t col = 0; col < width; col++)
@@ -29,8 +33,11 @@ matMulSquare_baseline(const double *M_1,
             P[i_p] = elmt_sum;
         }
     }
+    debug("Matrix multiplication complete");
 
     return 0;
+error:
+    return -1;
 }
 
 
@@ -98,5 +105,26 @@ matMulSquare_pretranspose(const double *M_1,
                           double *P,
                           uint32_t width)
 {
-    return 1;
+    const uint32_t matrix_size = width * width;
+    check(matrix_size >= width, "Integer overflow (uint32_t).");
+    
+    for (uint32_t row = 0; row < width; row++)
+    {
+        for (uint32_t col = 0; col < width; col++)
+        {
+            const uint32_t i_p = row * width + col;
+            double elmt_sum = 0.0l;
+#           pragma omp parallel for reduction(+:elmt_sum)
+            for (uint32_t i = 0; i < width; i++)
+            {
+                const uint32_t index = row * width + i;
+                elmt_sum += M_1[index] * M_2[index];
+            }
+            P[i_p] = elmt_sum;
+        }
+    }
+
+    return 0;
+error:
+    return -1;
 }

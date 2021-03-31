@@ -228,7 +228,8 @@ main(int argc, char *argv[])
 
     debug("Performing matrix multiplication");
     int my_err = mulfunc(M_1, M_2, P, width);
-    check(my_err, "Something went wrong during matrix multiplication");
+    debug("my_err: %d", my_err);
+    check(my_err == 0, "Something went wrong during matrix multiplication");
 
     debug("Returned from matrix multiplication");
     debug("Printing product matrix to stdout");

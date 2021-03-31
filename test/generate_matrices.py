@@ -39,3 +39,7 @@ for width in widths:
     np.savetxt(mfile_2, M_2, delimiter=' ', fmt="%lf");
     pfile = "matmul_" + f"{width}" + ".dat"
     np.savetxt(pfile, P, delimiter=' ', fmt="%lf");
+    mfile_2t = "m_2_" + f"{width}t" + ".dat"
+    np.savetxt(mfile_2t, M_2.T, delimiter=' ', fmt="%lf");
+    pfilet = "matmul_" + f"{width}t" + ".dat"
+    np.savetxt(pfilet, P.T, delimiter=' ', fmt="%lf");

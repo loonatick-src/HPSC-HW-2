@@ -9,8 +9,9 @@ for width in widths:
         print(f"Generating random matrices for width {width}")
         M_1 = np.random.uniform(low=10.0, high=126.0, size=(width,width))
         M_2 = np.random.uniform(low=52.0, high=303.5, size=(width,width))
-        print("Calculating product matrix...");
+        print("Calculating product matrices...");
         P = np.matmul(M_1, M_2)
+        Pt = np.matmul(M_1, M_2.T)
         Pinv = np.zeros((width, width));
         try:
             Pinv = la.inv(P)
@@ -32,6 +33,7 @@ for width in widths:
             print(f"Condition number larger than {condition_number_threshold}, trying again");
         # else continue
 
+    print("Saving matrices to disc...")
     condition_number_threshold *= 50.0;
     mfile_1 = "m_1_" + f"{width}" + ".dat"
     np.savetxt(mfile_1, M_1, delimiter=' ', fmt="%lf");
@@ -42,4 +44,4 @@ for width in widths:
     mfile_2t = "m_2_" + f"{width}t" + ".dat"
     np.savetxt(mfile_2t, M_2.T, delimiter=' ', fmt="%lf");
     pfilet = "matmul_" + f"{width}t" + ".dat"
-    np.savetxt(pfilet, P.T, delimiter=' ', fmt="%lf");
+    np.savetxt(pfilet, Pt, delimiter=' ', fmt="%lf");

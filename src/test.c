@@ -18,10 +18,10 @@
 const uint32_t width = 100;
 const uint32_t matsize = width * width;
 const uint32_t memsize = matsize * sizeof(double);
-const double threshold_percent_error = 1.e-4;
+const double threshold_percent_error = 1.e-2;
 const char *m1_path = "m_1_100.dat";
 const char *m2_path = "m_2_100.dat";
-const char *m2t_path = "m_2t_100.dat";
+const char *m2t_path = "m_2_100t.dat";
 const char *mmulpath = "matmul_100.dat";
 const char *mmulpatht = "matmul_100t.dat";
 
@@ -32,8 +32,9 @@ read_matrix(double *m, FILE *filehandle, uint32_t matsize)
     check(matsize > 0, "Matrix size must be a positive integer, duh");
     for (int i = 0; i < matsize; i++)
     {
-        int fscanf_err = fscanf(filehandle, "%lf", &(m[i]));
-        check(fscanf_err, "fscanf threw some error");
+        int fscanf_out = fscanf(filehandle, "%lf", &(m[i]));
+        check(fscanf_out != EOF, "There is nothing more to read from stdin");
+        check(fscanf_out, "fscanf couldn't read anything");
     }
     return EXIT_SUCCESS;
 error:
@@ -45,6 +46,7 @@ error:
 double
 percent_error(double of, double against)
 {
+    debug("%lf %lf", of, against);
     return (fabs(of - against)/against) * 100.0l;
 }
 
@@ -56,7 +58,10 @@ validate_matrix(double *v, double *a, uint32_t matsize)
     {
         double err = percent_error(v[index], a[index]);
         if (err > threshold_percent_error)
+        {
+            log_err("Erroneous value at index %d, expected close to %lf, found %lf", index, a[index], v[index]);
             return -1;
+        }
         index++;
     }
     return 0;
@@ -75,13 +80,11 @@ test_matmul_omp()
 
     FILE *m1_file = NULL;
     FILE *m2_file = NULL;
-    FILE *m2t_file = NULL;
     FILE *matmul_file = NULL;
 
     log_info("Opening files for reading matrices");
     m1_file = fopen(m1_path, "r");
     m2_file = fopen(m2_path, "r");
-    m2t_file = fopen(m2t_path, "r");
     matmul_file = fopen(mmulpath, "r");
 
     log_info("Reading matrices into memory");
@@ -97,22 +100,39 @@ test_matmul_omp()
 
     log_info("Testing first implementation (direct multiplication)");
     int my_err = matMulSquare_baseline(m1, m2, p, width);
-    check(my_err, "Something went wrong in the first implementation");
+    check(!my_err, "Something went wrong in the first implementation");
     my_err = validate_matrix(p, matmul, matsize);
-    check(my_err == 0, "Output of first implementation seems erroneous");
+    check_debug(!my_err, "Output of first implementation seems erroneous");
+    log_info("Testing of first implementation complete");
+
 
     log_info("Testing second implementation (transposed multiplication)");
     my_err = matMulSquare_transpose(m1, m2, p, width);
     check(!my_err, "Something went wrong in the second implementation");
+    my_err = validate_matrix(p, matmul, matsize);
+    check(!my_err, "Output of second implementation seems erroneous");
+    log_info("Testing of second implementation complete");
 
 
-    log_info("Reading transposed matrix into memory");
-    my_err = read_matrix(m2, m2t_file, matsize);
-    check(my_err, "Something went wrong while reading transposed matrix");
-    fclose(m2t_path);
+    log_info("Reading transposed matrices into memory");
+    matmul_file = fopen(mmulpatht, "r");
+    check(matmul_file, "Error while opening %s: file may not exist", mmulpatht);
 
-    log_info("Testing second implementation (pretransposed multiplication");
+    m2_file = fopen(m2t_path, "r");
+    check(m2_file, "Error while opening %s: file may not exist", m2t_path);
+    my_err = read_matrix(m2, m2_file, matsize);
+    check(!my_err, "Something went wrong while reading transposed matrix");
+    fclose(m2_file);
+    my_err = read_matrix(matmul, matmul_file, matsize);
+    check(!my_err, "Something went wrong while reading transposed product matrix");
+    fclose(matmul_file);
+
+    log_info("Testing third implementation (pretransposed multiplication");
     my_err = matMulSquare_pretranspose(m1, m2, p, width);
+    check(!my_err, "Something went wrong with the third implementation");
+    my_err = validate_matrix(p, matmul, matsize);
+    check(!my_err, "Third implementation seems erroneous");
+    log_info("Third implementation tested successfully");
 
     free(m1);
     free(m2);
@@ -122,6 +142,15 @@ error:
     if (m1) free(m1);
     if (m2) free(m2);
     if (p) free(p);
+    if (m1_file) fclose(m1_file);
+    if (m2_file) fclose(m2_file);
+
+}
 
 
+int main(int argc, char *argv[])
+{
+    test_matmul_omp();
+
+    return 0;
 }

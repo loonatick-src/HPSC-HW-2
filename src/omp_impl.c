@@ -50,6 +50,7 @@ matMulSquare_transpose(const double *M_1,
     // transposing the second matrix
     // fewer cache misses
     // large overhead of transposition
+    // cumulative less than baseline?
     double *M_2trnsps = NULL;
     const uint32_t matrix_size = width * width;
     check(matrix_size >= width, "Integer overflow (uint32_t).");
@@ -82,8 +83,7 @@ matMulSquare_transpose(const double *M_1,
 #           pragma omp parallel for reduction(+:elmt_sum)
             for (uint32_t i = 0; i < width; i++)
             {
-                const uint32_t index = row * width + i;
-                elmt_sum += M_1[index] * M_2trnsps[index];
+                elmt_sum += M_1[row*width + i]*M_2trnsps[col * width + i];
             }
             P[i_p] = elmt_sum;
         }
@@ -117,8 +117,7 @@ matMulSquare_pretranspose(const double *M_1,
 #           pragma omp parallel for reduction(+:elmt_sum)
             for (uint32_t i = 0; i < width; i++)
             {
-                const uint32_t index = row * width + i;
-                elmt_sum += M_1[index] * M_2[index];
+                elmt_sum += M_1[row*width + i] * M_2[col*width + i];
             }
             P[i_p] = elmt_sum;
         }

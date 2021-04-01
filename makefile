@@ -15,6 +15,8 @@ omp_impl.o: $(SRCDIR)/omp_impl.c
 	$(CC) $(CFLAGS) $(OMPFLAGS) -DNDEBUG -c $(SRCDIR)/omp_impl.c -o $(BINDIR)/omp_impl.o
 
 test: test_omp test_mpi
+	cd $(TESTDIR) && ./test.out
+	cd ..
 
 test_omp: $(SRCDIR)/test.c $(SRCDIR)/omp_impl.c
 	if [ ! -e $(TESTDIR) ]; then mkdir $(TESTDIR); fi

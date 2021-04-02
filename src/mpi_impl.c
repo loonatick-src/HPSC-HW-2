@@ -8,7 +8,9 @@
 
 
 int
-read_matrices(double *M_1, double *M_2, FILE *m1_file, FILE *m2_file, int width, int proc_rank, int num_procs);
+read_matrices(double *M_1, double *M_2,
+        FILE *m1_file, FILE *m2_file, int width, 
+        int proc_rank, int num_procs);
 {
     /* reads matrices from the files into the malloc'd memory */
     const int matrix_size = width * width;
@@ -36,16 +38,6 @@ read_matrices(double *M_1, double *M_2, FILE *m1_file, FILE *m2_file, int width,
 
     return EXIT_SUCCESS;
 error:
-    mpi_err = MPI_Initialized(&mpi_init_flag);
-    if (mpi_err)
-    {
-        log_warn("Call to `MPI_Finalized` returned with error");
-    } else if (mpi_init_flag) 
-    {
-        log_info("An MPI environment was found to be initialized during cleanup. Attempting to finalize");
-        mpi_err = MPI_Finalize();
-        if (mpi_err)
-            log_warn("Call to `MPI_Finalize` returned with error");
-    }
+    // let caller handle error
     return EXIT_FAILURE;
 }

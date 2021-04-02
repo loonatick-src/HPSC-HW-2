@@ -14,15 +14,26 @@ omp: $(SRCDIR)/main_omp.c $(SRCDIR)/omp_impl.o
 omp_impl.o: $(SRCDIR)/omp_impl.c
 	$(CC) $(CFLAGS) $(OMPFLAGS) -DNDEBUG -c $(SRCDIR)/omp_impl.c -o $(BINDIR)/omp_impl.o
 
+testdbg: test_ompdbg test_mpidbg
+	cd $(TESTDIR) && ./test.out
+	cd ..
+
+test_ompdbg: $(SRCDIR)/test.c $(SRCDIR)/omp_impl.c
+	if [ ! -e $(TESTDIR) ]; then mkdir $(TESTDIR); fi
+	$(CC) $(CFLAGS) $(OMPFLAGS) $(TESTFLAGS) $(SRCDIR)/test.c $(SRCDIR)/omp_impl.c -o $(TESTDIR)/test.out
+
+test_mpidbg: $(SRCDIR)/test.c
+	echo "MPI testing not implemented"
+
 test: test_omp test_mpi
 	cd $(TESTDIR) && ./test.out
 	cd ..
 
-test_omp: $(SRCDIR)/test.c $(SRCDIR)/omp_impl.c
+test_omp: $(SRCDIR)/omp_impl.c
 	if [ ! -e $(TESTDIR) ]; then mkdir $(TESTDIR); fi
-	$(CC) $(CFLAGS) $(OMPFLAGS) $(TESTFLAGS) $(SRCDIR)/test.c $(SRCDIR)/omp_impl.c -o $(TESTDIR)/test.out
+	$(CC) $(CFLAGS) $(OMPFLAGS) $(TESTFLAGS) -DNDEBUG $(SRCDIR)/test.c $(SRCDIR)/omp_impl.c -o $(TESTDIR)/test.out
 
-test_mpi: $(SRCDIR)/test.c
+test_mpi: $(SRCDIR)/mpi_impl.c
 	echo "MPI testing not implemented"
 
 clean:

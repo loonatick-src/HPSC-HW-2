@@ -1,6 +1,7 @@
 #include "dbg.h"
 #include "omp_impl.h"
 
+#include <omp.h>
 #include <math.h>
 #include <inttypes.h>
 #include <stdint.h>
@@ -70,6 +71,9 @@ validate_matrix(double *v, double *a, uint32_t matsize)
 void
 test_matmul_omp()
 {
+#ifdef _OPENMP
+    omp_set_num_threads(6);
+#endif
     log_info("Testing OpenMP matrix multiplication implementations");
     log_info("Allocating space for matrices");
     double *m1 = (double *)malloc(memsize);
@@ -128,6 +132,10 @@ test_matmul_omp()
     my_err = validate_matrix(p, matmul, matsize);
     check(!my_err, "Third implementation seems erroneous");
     log_info("Third implementation tested successfully");
+
+#ifdef _OPENMP
+    log_info("Testing of OpenMP implementations completed successfully");
+#endif
 
     free(m1);
     free(m2);

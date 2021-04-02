@@ -6,6 +6,8 @@
 #include <stdlib.b>
 #include <string.h>
 
+#define NOT_IMPLEMENTED_ERROR 30
+
 
 int
 read_matrices(double *M_1, double *M_2,
@@ -41,3 +43,25 @@ error:
     // let caller handle error
     return EXIT_FAILURE;
 }
+
+
+int
+matMulSquare_baseline(const double *M_1, const double *M_2, double *P,
+        int width, int proc_rank, int num_procs)
+{
+    return NOT_IMPLEMENTED_ERROR;
+}
+
+int
+matMulSquare_transpose(const double *M_1, const double *M_2, double *P,
+        int width, int proc_rank, int num_procs)
+{
+    return NOT_IMPLEMENTED_ERROR;
+}
+
+int matMulSquare_pretranspose(const double *M_1, const double *M_2, double *P,
+        int width, int proc_rank, int num_procs)
+{
+    return NOT_IMPLEMENTED_ERROR;
+}
+

@@ -127,3 +127,8 @@ matMulSquare_pretranspose(const double *M_1,
 error:
     return -1;
 }
+
+
+// TODO: Incorporate ideas from Hopkins chapter 1
+// TODO: Add another imlementation - the algorithm in Cormen
+

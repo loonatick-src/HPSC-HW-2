@@ -6,3 +6,4 @@ with each other.
 See header files for API.
 
 Run `make test` to run tests in `src/test.c`
+Run `make testdbg` to run tests with debug printing enabled

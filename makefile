@@ -26,5 +26,7 @@ test_mpi: $(SRCDIR)/test.c
 	echo "MPI testing not implemented"
 
 clean:
-	rm ../bin/*
-	rmdir ../bin
+	rm $(BINDIR)/*.out
+	rm $(BINDIR)/*.o
+	rm $(TESTDIR)/*.out
+	rmdir $(BINDIR)

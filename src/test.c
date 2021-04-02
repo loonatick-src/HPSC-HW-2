@@ -133,13 +133,13 @@ test_matmul_omp()
     free(m2);
     free(p);
     free(matmul);
+    return ;
 error:
     if (m1) free(m1);
     if (m2) free(m2);
     if (p) free(p);
     if (m1_file) fclose(m1_file);
     if (m2_file) fclose(m2_file);
-
 }
 
 

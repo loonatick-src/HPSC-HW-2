@@ -33,15 +33,14 @@ for width in widths:
             break;
         print("Calculating condition number...");
         condition_number = la.norm(P, ord='fro') * la.norm(Pinv, ord='fro');
-        print(condition_number);
+        print(":.2E".format(condition_number));
         # it turns out that matrices generated using
         # purely uniform distributions tend to be
         # poorly conditioned
         if (condition_number < condition_number_threshold):
             break;
         else:
-            print(f"Condition number larger than {condition_number_threshold}, trying again");
-        # else continue
+            print("Condition number larger than {:.2E}, trying again".format(condition_number_threshold));
 
     print("Saving matrices to disc...")
     # left matrix

@@ -21,7 +21,6 @@ const uint32_t memsize = matsize * sizeof(double);
 const double threshold_percent_error = 1.e-2;
 const char *m1_path = "m_1_100.dat";
 const char *m2_path = "m_2_100.dat";
-const char *m2t_path = "m_2_100t.dat";
 const char *mmulpath = "matmul_100.dat";
 const char *mmulpatht = "matmul_100t.dat";
 
@@ -97,7 +96,7 @@ test_matmul_omp()
     read_matrix(matmul, matmul_file, matsize);
     fclose(matmul_file);
 
-
+    // First implementation
     log_info("Testing first implementation (direct multiplication)");
     int my_err = matMulSquare_baseline(m1, m2, p, width);
     check(!my_err, "Something went wrong in the first implementation");
@@ -106,6 +105,7 @@ test_matmul_omp()
     log_info("Testing of first implementation complete");
 
 
+    // Second implementation
     log_info("Testing second implementation (transposed multiplication)");
     my_err = matMulSquare_transpose(m1, m2, p, width);
     check(!my_err, "Something went wrong in the second implementation");
@@ -113,16 +113,11 @@ test_matmul_omp()
     check(!my_err, "Output of second implementation seems erroneous");
     log_info("Testing of second implementation complete");
 
-
+    // Third implementation
     log_info("Reading transposed matrices into memory");
     matmul_file = fopen(mmulpatht, "r");
     check(matmul_file, "Error while opening %s: file may not exist", mmulpatht);
 
-    m2_file = fopen(m2t_path, "r");
-    check(m2_file, "Error while opening %s: file may not exist", m2t_path);
-    my_err = read_matrix(m2, m2_file, matsize);
-    check(!my_err, "Something went wrong while reading transposed matrix");
-    fclose(m2_file);
     my_err = read_matrix(matmul, matmul_file, matsize);
     check(!my_err, "Something went wrong while reading transposed product matrix");
     fclose(matmul_file);

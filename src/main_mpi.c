@@ -13,131 +13,180 @@
 
 /* TODO
  * use getopt to get provide user with the option to input
-   transposed right matrix for fast multiplication
+ * transposed right matrix for fast multiplication
  * complete the rest of the code
  */
+
+typedef int (*implementation_t)(const double *, const double *, double *, int, int, int);
+
+const implementation_t implementations[] = {
+    matMulSquare_baseline,
+    matMulSquare_transpose,
+    matMulSquare_pretranspse,
+    matMulSquare_blockcyclic
+};
+
+cont int num_impl = sizeof(implementations)/sizeof(implementation_t);
+
+int help_flag = 0;
+int impl_flag = 0;
+
+
+struct option longopts[] = {
+    { "help", no_argument, &help_flag, 1 },
+    { "implementation", required_argument, &impl_flag, 'i' },
+    { "width", required_argument, NULL, 'w' },
+    { "lpath", required_argument, NULL, 'l' },
+    { "rpath", required_argument, NULL, 'r' },
+    { 0 },
+};
+
+
+void
+usage(FILE *fp, const char *path)
+{
+    // TODO: complete this help message
+    const char *basename = strchr(path, '/');
+    basename = basename ? basename + 1 : path;
+
+    fprintf(fp, "usage: %s [OPTION]\n", basename);
+    fprintf(fp, "   -h, --help\t\t"
+                "Print this help and exit.\n");
+    fprintf(fp, "   -w, --width=WIDTH\t"
+                "Width of square matrices to be input\n");
+    fprintf(fp, "   -l, --lpath=LEFT_MATRIX_FILE_PATH\t"
+                "Path to (row-major) entries of left matrix.\n");
+    fprintf(fp, "   -r, --rightpath=RIGHT_MATRIX_FILE_PATH\t"
+                "Path to (row-major) entries of right matrix.\n");
+    fprintf(fp, "   -i, --implementation=IMPLEMENTATION\t"
+                "Use Specify implementation (1, 2, or 3)\n");
+}
 
 
 int main(int argc, char *argv[])
 {
     double *M_1, *M_2, *P;
-    FILE *m1_file, *m2_file;
+    char m1_path[128], m2_path[128];
+    FILE *m1_file = NULL, *m2_file = NULL;
+    implementation_t matmul;
+    int width = 0, impl_index = 0;
+
     int mpi_init_flag, mpi_err = MPI_Init(&argc, &argv);
     check(mpi_err, "Failed to initialize MPI");
 
     int proc_rank, num_procs;
     mpi_err = MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-    check(mpi_err, "`Call to MPI_Comm_size` returned with error");
+    check(!mpi_err, "`Call to MPI_Comm_size` returned with error");
     check(num_procs != 1, "No, no base case for you.");
-    check(num_procs > 2, "Mate, why even use MPI if you are not going to spawn more than 2 processes?");
+    check(num_procs > 2, "Mate, why even use MPI\
+            if you are not going to spawn more than 2 processes?");
+    input_flags.procs_flag = 1;
 
     mpi_err = MPI_Comm_rank(MPI_COMM_WORLD, &proc_rank);
-    check(mpi_err, "Call to `MPI_Comm_rank` returned with error");
 
-    if (proc_rank == 0) 
+    check(!mpi_err, "Call to `MPI_Comm_rank` returned with error");
+    mpi_debug(proc_rank, "Initializing MPI environment with\
+                %d processes", num_procs);
+   }
+
+    while(1)
     {
-        check(argc >= 4, "Usage: ./%s <n> <m1_path> <m2_path>,\
-                where\nn: width of matrices (base 10)\
-                \nm1_path: path of matrix 1 file (row-major)\
-                \nm2_path: path of matrix 2 file (row-major)", argv[0]);
+        int opt = getopt_long(argc, argv, "hl:r:w:i:", longopts, 0);
 
-        const uint64_t widthl = strtoul(argv[1], NULL, 10);
-        const uint64_t width_proto = UINT64_TO_INT32_MASK & widthl;
-        check(width_proto == widthl, "Integer overflow");
-        check(width_proto & INT32_SIGN_MASK > 0, "Integer overflow");
+        int impl_index;
+        if (opt == -1) break;
 
-        const int width = (int) widthl;
-        const int matsize = widthl * widthl;
-        check(matsize >= widthl, "Integer overflow (number of matrix elements) - proposed matrix sizes are too largs");
-
-        const int mem_size = matsize * sizeof(double);
-        check(mem_size > matsize, "Integer overflow (number of bytes) - proposed matrix sizes are too large");
-
-        const char *m1_path = argv[2];
-        const char *m2_path = argv[3];
-
-        m1_file = fopen(m1_path, "r");
-        check(m1_file, "Failed to open %s", m1_path);
-
-        m2_file = fopen(m2_path, "r");
-        check(m2_file, "Failed to open %s", m2_path);
-
-        M_1 = (double *)malloc(mem_size);
-        check_mem(M_1);
-
-        M_2 = (double *)malloc(mem_size);
-        check_mem(M_2);
-
-        P = (double *)malloc(mem_size);
-        check_mem(P);
-
-        int in_count = 0;
-        double melmnt;
-        while (in_count < matsize)
+        switch(opt)
         {
-            int fscanf_err = fscanf(m1_file, "%lf", &melmnt);
-            check(scanf_err != EOF, "Unexpected EOF: scanned %lu elements, promised %lu elements", in_count, matsize);
-            check(scanf_err, "`scanf` returned with error after scanning %lu elements", in_count);
-
-            M_1[in_count++] = melmnt;
+            case('h'):
+                help_flag = 1;
+                break;
+            case('w'):
+                width = atoi(optarg);
+                mpi_debug(proc_rank, "Setting width to %d", width);
+                break;
+            case('l'):
+                strncpy(m1_path, optarg, sizeof(m1_path));
+                m1_path[sizeof(m1_file) - 1] = '\0';
+                m1_file = fopen(m1_path, "r");
+                mpi_debug(proc_rank, "Setting left matrix file path\
+                            to %s", m1_path);
+                break;
+            case('r'):
+                strncpy(m2_path, optarg, sizeof(m2_path));
+                m2_path[sizeof(m2_path)-1] = '\0';
+                m2_file = fopen(m2_path, "r");
+                mpi_debug(proc_rank, "Setting right matrix file path to %s", m2_path);
+                break;
+            case('i'):
+                impl_index = atoi(optarg);
+                if (impl_index < 1 || impl_index > num_impl)
+                {
+                    log_warn("Argument for selecting implementation must be an integer in 1..=%d", num_impl);
+                    help_flag = 1;
+                    break;
+                }
+                debug("Using implementation number %d", impl_index);
+                matmul = implementations[impl_index - 1];
+            case('?'):
+                help_flag = 1;
+                debug("Malformed option?");
+                break;
+            default:
+                break;
         }
-        fclose(m1_file);
-
-        in_count = 0;
-        while (in_count < matsize)
-        {
-            int fscanf_err = fscanf(m2_file, "%lf", &melmnt);
-            check(scanf_err != EOF, "Unexpected EOF: scanned %lu elements, promised %lu elements", in_count, matsize);
-            check(scanf_err, "`scanf` returned with error after scanning %lu elements", in_count);
-
-            M_2[in_count++] = melmnt;
-        }
-        fclose(m2_file);
-
-        const int num_rows_per_proc = width / num_procs;
-        check(num_rows_per_proc > 0, "Poorly balanced inputs.\
-                \nWidth: %d, Number of MPI Processes: %d", width, num_procs);
-        const int anomalous_proc = num_procs - 1;
-        const int anomalous_num_rows = num_rows_per_proc + (num_rows % num_rows_per_proc);
-
-        if ((num_procs-1) * num_rows_per_proc + anomalous_num_rows != width)
-        {
-            sentinel("There is a mistake in the logic\
-                    for calculating number of rows to be sent to each process");
-        }
-        const int anomalous_num_elmts = anomalous_num_rows * width;
-
-
-        const int num_elmts = width * num_rows_per_proc;
-        for (int proc = 1; proc < num_procs-1; proc++)
-        {
-            MPI_Send(M_1 + (proc-1)*num_elmts,
-                    num_elmts,
-                    MPI_DOUBLE,
-                    proc, 0,
-                    MPI_COMM_WORLD);
-        }
-        MPI_Send(M_1 + anomalous_proc * num_elmts,
-                anomalous_num_elmts, 
-                MPI_DOUBLE,
-                anomalous_proc, 0, 
-                MPI_COMM_WORLD);
-    } else
-    {
-        
     }
 
+    int we_should_print_usage = (help_flag ||
+                                  !m1_file ||
+                                  !m2_file ||
+                               !impl_index ||
+                                    !width);
+
+    if (we_should_print_usage)
+    {
+        usage(stderr, argv[0]);
+        goto error;
+    }
+
+    check(width > 0, "Negative width provided");
+    const int mat_size = width * width;
+    const int mem_size = mat_size * mem_size; 
+
+    M_1 = (double *)malloc(mem_size);
+    check_mem(M_1);
+    M_2 = (double *)malloc(mem_size);
+    check_mem(M_2);
+    P = (double *)malloc(mem_size);
+    check_mem(P);
+
+
+    read_matrices(M_1, M_2, m1_file, m2_file, width, proc_rank, num_procs);
+    fclose(m1_file);
+    fclose(m2_file);
+
+    matmul(M_1, M_2, P, width, proc_rank, num_procs);
+    for (int i = 0 ; i < mat_size; i++)
+    {
+        int j = (i + 1) % width;
+        printf("%lf", P[i]);
+        if (j == 0)
+            putc('\n', stdout);
+        else
+            putc(' ', stdout);
+    }
 
     free(M_1);
     free(M_2);
     free(P);
 
-    mpi_err = MPI_Finlize();
-    check(mpi_err, "MPI_Failed to finalize after everything else is done and dusted");
-    return EXIT_SUCCESS;
-error:
-    
+    mpi_err = MPI_Finalize();
+    check(mpi_err, "MPI failed to finalize after everything is\
+            done and dusted");
 
+    return EXIT_SUCCESS;
+
+error:
     if (M_1)
     {
         log_info("Freeing memory allocated for left input matrix\

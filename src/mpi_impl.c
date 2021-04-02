@@ -1,52 +1,51 @@
 #include "dbg.h"
-#include "mpi_impl.h"
 #include <inttypes.h>
-#include <stdlib.h>
+#include <mpi.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.b>
+#include <string.h>
 
 
 int
-matMulSquare_baseline(const double *M_1, const double *M_2, double *P, const uint32_t width)
+read_matrices(double *M_1, double *M_2, FILE *m1_file, FILE *m2_file, int width, int proc_rank, int num_procs);
 {
+    /* reads matrices from the files into the malloc'd memory */
+    const int matrix_size = width * width;
     int mpi_init_flag;
-    mpi_err = MPI_Init(NULL, NULL);
-    check(mpi_err, "MPI environment failed to initialize");
+    int mpi_err = MPI_Initialized(&mpi_init_flag);
+    check(!mpi_err, "Call to `MPI_Initialized` returned with error");
+    check(!mpi_init_flag, "No MPI environment was found to be initialized");
 
-    int proc_rank, num_procs;
-    mpi_err = MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-    check(mpi_err, "Call to `MPI_Comm_size` returned with error");
-    check(num_procs > 2, "Mate, why even use MPI if your number of processes is %d?", num_procs);
+    check_mem(M_1);
+    check_mem(M_2);
+    if (proc_rank == 0)
+    {
+    check(m1_file, "Unopened file has been passed");
+    check(m2_file, "Unopened file has been passed");
 
-    mpi_err = MPI_Comm_rank(MPI_COMM_WORLD, &proc_rank);
-    check(mpi_err, "Call to `MPI_Comm_rank` returned with error");
+    for (int i = 0; i < matrix_size; i++)
+    {
+        int fscanf_ret = fscanf(m1_file, "%lf", &M_1[i]);
+        check(fscanf_ret != EOF, "Unexpected EOF, left matrix. Scanned %d elements, promised %d elements", i, matrix_size);
+        check(fscanf_ret != 0, "Failed to scan anything after scanning %d elements of the left matrix", i);
+        fscanf_ret = fscanf(m2_file, "%lf", &M_2[i]);
+        check(fscanf_ret != EOF, "Unexpected EOF, right matrix. Scanned %d elements, promised %d elements", i, matrix_size);
+        check(fscanf_ret != 0, "Failed to scan anything after scanning %d elements of the right matrix", i);
+    }
 
-    const uint32_t matsize = width * width; 
-
-     
     return EXIT_SUCCESS;
-
 error:
     mpi_err = MPI_Initialized(&mpi_init_flag);
-
     if (mpi_err)
     {
-        log_warn("Call to `MPI_Initialized` returned with error");
-    }
-
-    if (mpi_init_flag)
+        log_warn("Call to `MPI_Finalized` returned with error");
+    } else if (mpi_init_flag) 
     {
-        log_info("An MPI environment was initialized.\
-                Attempting to finalize...");
+        log_info("An MPI environment was found to be initialized during cleanup. Attempting to finalize");
         mpi_err = MPI_Finalize();
         if (mpi_err)
-        {
-            log_warn("MPI_Finalize() returned with error during cleanup");
-        } else
-        {
-            log_info("MPI Finalized");
-        }
+            log_warn("Call to `MPI_Finalize` returned with error");
     }
-
     return EXIT_FAILURE;
 }
-
-

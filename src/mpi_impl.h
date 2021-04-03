@@ -8,17 +8,17 @@ read_matrices(double *M_1, double *M_2,
         int proc_rank, int num_procs);
 
 int
-matMulSquare_baseline(const double *M_1, const double *M_2,
+matMulSquare_baseline_mpi(const double *M_1, const double *M_2,
         double *P, int width,
         int proc_rank, int num_procs);
 
 int
-matMulSquare_transpose(const double *M_1, const double *M_2,
+matMulSquare_transpose_mpi(const double *M_1, const double *M_2,
         double *P, int width,
         int proc_rank, int num_procs);
 
 int
-matMulSquare_pretranspose(const double *M_1, const double *M_2,
+matMulSquare_pretranspose_mpi(const double *M_1, const double *M_2,
         double *P, int width,
         int proc_rank, int num_procs);
 #endif

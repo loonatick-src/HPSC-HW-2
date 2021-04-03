@@ -8,7 +8,7 @@
 
 
 int
-matMulSquare_baseline(const double *M_1,
+matMulSquare_baseline_omp(const double *M_1,
                       const double *M_2,
                       double *P, 
                       const uint32_t width) 
@@ -42,7 +42,7 @@ error:
 
 
 int
-matMulSquare_transpose(const double *M_1,
+matMulSquare_transpose_omp(const double *M_1,
                        const double *M_2,
                        double *P,
                        uint32_t width)
@@ -100,7 +100,7 @@ error:
 
 
 int
-matMulSquare_pretranspose(const double *M_1,
+matMulSquare_pretranspose_omp(const double *M_1,
                           const double *M_2,
                           double *P,
                           uint32_t width)

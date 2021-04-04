@@ -1,7 +1,13 @@
 #include "dbg.h"
-#include "omp_impl.h"
 
+#ifdef _MPI_TEST
+#include <mpi.h>
+#include "mpi_impl.h"
+#endif
+#ifdef _OMP_TEST
 #include <omp.h>
+#include "omp_impl.h"
+#endif
 #include <math.h>
 #include <inttypes.h>
 #include <stdint.h>
@@ -68,6 +74,7 @@ validate_matrix(double *v, double *a, uint32_t matsize)
 }
 
 
+#ifdef _OMP_TEST
 void
 test_matmul_omp()
 {
@@ -149,11 +156,94 @@ error:
     if (m1_file) fclose(m1_file);
     if (m2_file) fclose(m2_file);
 }
+#endif
+
+
+#ifdef _MPI_TEST
+void
+test_matmul_mpi()
+{
+    // TODO: change mpi_err to mpi_code
+    double *M_1 = NULL, *M_2 = NULL, *P = NULL;
+    FILE *m1_file = NULL, *m2_file = NULL;
+
+    int mpi_init_flag, mpi_err = MPI_Init(NULL, NULL);
+    check(!mpi_err, "MPI Failed to initialize");
+
+    int num_procs = 0, proc_rank = 0;
+    mpi_err = MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+
+    check(num_procs > 0, "Call to MPI_Comm_size failed");
+    mpi_err = MPI_Comm_rank(MPI_COMM_WORLD, &proc_rank);
+
+    check(num_procs > 0, "Call to MPI_Comm_rank failed");
+    debug("%d: num_procs = %d", proc_rank, num_procs); 
+    const int n = 100;
+    const int nn = n * n;
+    if (proc_rank == 0) 
+    {
+    M_1 = (double *) malloc(nn * sizeof(double));
+    check_mem(M_1);
+    M_2 = (double *) malloc(nn * sizeof(double));
+    check_mem(M_2);
+    P = (double *) malloc(nn * sizeof(double));
+    check_mem(P);
+    m1_file = fopen(m1_path, "r");
+    m2_file = fopen(m2_path, "r");
+    }
+
+    log_info("Process %d: Testing `read_matrices`", proc_rank);
+    int my_err = read_matrices(M_1, M_2, m1_file, m2_file, n,
+            proc_rank, num_procs);
+    check(!my_err, "Call to `read_matrices` returned with error");
+    
+
+    debug("%d: Testing baseline implementation", proc_rank);
+    debug("%d: Freeing resources", proc_rank);
+    if (M_1) free(M_1);
+    if (M_2) free(M_2);
+    if (P) free(P);
+    if (m1_file) fclose(m1_file);
+    if (m2_file) fclose(m2_file);
+    mpi_err = MPI_Finalize();
+    return;
+error:
+    if (m1_file)
+        fclose(m1_file);
+    if (m2_file)
+        fclose(m2_file);
+    if (M_1)
+        free(M_1);
+    if(M_2)
+        free(M_2);
+    if (P)
+        free(P);
+
+    mpi_err = MPI_Initialized(&mpi_init_flag);
+    if (mpi_err)
+    {
+        log_warn("Call to `MPI_Initialized` failed");
+    } else if (mpi_init_flag)
+    {
+        log_info("An MPI environment was found initialized during cleanup. Attempting to finalize...");
+        mpi_err = MPI_Finalize();
+        if (mpi_err)
+        {
+            log_warn("Call to `MPI_Finalize` failed");
+        }
+    }
+}
+#endif
 
 
 int main(int argc, char *argv[])
 {
+#ifdef _OMP_TEST
     test_matmul_omp();
+#endif
 
+#ifdef _MPI_TEST
+    test_matmul_mpi();
+#endif
     return 0;
 }

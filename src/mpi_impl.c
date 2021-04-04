@@ -3,7 +3,7 @@
 #include <mpi.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.b>
+#include <stdlib.h>
 #include <string.h>
 
 #define NOT_IMPLEMENTED_ERROR 30
@@ -12,19 +12,20 @@
 int
 read_matrices(double *M_1, double *M_2,
         FILE *m1_file, FILE *m2_file, int width, 
-        int proc_rank, int num_procs);
+        int proc_rank, int num_procs)
 {
-    /* reads matrices from the files into the malloc'd memory */
+   /* reads matrices from the files into the malloc'd memory */
     const int matrix_size = width * width;
     int mpi_init_flag;
     int mpi_err = MPI_Initialized(&mpi_init_flag);
     check(!mpi_err, "Call to `MPI_Initialized` returned with error");
-    check(!mpi_init_flag, "No MPI environment was found to be initialized");
+    debug("MPI_Initialized crossed");
+    check(mpi_init_flag, "No MPI environment was found to be initialized");
 
-    check_mem(M_1);
-    check_mem(M_2);
     if (proc_rank == 0)
     {
+    check_mem(M_1);
+    check_mem(M_2);
     check(m1_file, "Unopened file has been passed");
     check(m2_file, "Unopened file has been passed");
 
@@ -47,7 +48,7 @@ error:
 
 
 int
-matMulSquare_transpose_mpi(const double *M_1, const double *M_2, double *P,
+matMulSquare_transpose_mpi(const double *M_1, double *M_2, double *P,
         int width, int proc_rank, int num_procs)
 {
     const int num_rows_per_proc = width / num_procs;
@@ -79,7 +80,7 @@ matMulSquare_transpose_mpi(const double *M_1, const double *M_2, double *P,
     }
 
     // broadcasting the transposed matrix from process 0
-    MPI_BCast(M_2tr, mat_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(M_2tr, mat_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 
     if (proc_rank == 0)
@@ -99,12 +100,12 @@ matMulSquare_transpose_mpi(const double *M_1, const double *M_2, double *P,
         for (int proc = 1; proc < num_procs-1; proc++)
         {
             MPI_Recv(P + skip, num_elements_per_proc, MPI_DOUBLE,
-                    proc, 1, MPI_COMM_WORLD);
+                    proc, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             skip += num_elements_per_proc;
         }
 
         MPI_Recv(P + skip, anomalous_num_elements, MPI_DOUBLE,
-                anomalous_proc, 1, MPI_COMM_WORLD);
+                anomalous_proc, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
     else 
     {
@@ -141,7 +142,7 @@ error:
 }
 
 int
-matMulSquare_baseline_mpi(const double *M_1, const double *M_2, double *P,
+matMulSquare_baseline_mpi(const double *M_1, double *M_2, double *P,
         int width, int proc_rank, int num_procs)
 {
     const int num_rows_per_proc = width / num_procs;
@@ -166,7 +167,7 @@ matMulSquare_baseline_mpi(const double *M_1, const double *M_2, double *P,
     }
 
     // broadcasting the transposed matrix from process 0
-    MPI_BCast(M_2, mat_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(M_2, mat_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 
     if (proc_rank == 0)
@@ -186,12 +187,12 @@ matMulSquare_baseline_mpi(const double *M_1, const double *M_2, double *P,
         for (int proc = 1; proc < num_procs-1; proc++)
         {
             MPI_Recv(P + skip, num_elements_per_proc, MPI_DOUBLE,
-                    proc, 1, MPI_COMM_WORLD);
+                    proc, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             skip += num_elements_per_proc;
         }
 
         MPI_Recv(P + skip, anomalous_num_elements, MPI_DOUBLE,
-                anomalous_proc, 1, MPI_COMM_WORLD);
+                anomalous_proc, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
     else 
     {
@@ -226,7 +227,8 @@ error:
 }
 
 
-int matMulSquare_pretranspose_mpi(const double *M_1, const double *M_2, double *P,
+int 
+matMulSquare_pretranspose_mpi(const double *M_1, double *M_2, double *P,
         int width, int proc_rank, int num_procs)
 {
     const int num_rows_per_proc = width / num_procs;
@@ -251,7 +253,7 @@ int matMulSquare_pretranspose_mpi(const double *M_1, const double *M_2, double *
     }
 
     // broadcasting the transposed matrix from process 0
-    MPI_BCast(M_2, mat_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(M_2, mat_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 
     if (proc_rank == 0)
@@ -271,12 +273,12 @@ int matMulSquare_pretranspose_mpi(const double *M_1, const double *M_2, double *
         for (int proc = 1; proc < num_procs-1; proc++)
         {
             MPI_Recv(P + skip, num_elements_per_proc, MPI_DOUBLE,
-                    proc, 1, MPI_COMM_WORLD);
+                    proc, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             skip += num_elements_per_proc;
         }
 
         MPI_Recv(P + skip, anomalous_num_elements, MPI_DOUBLE,
-                anomalous_proc, 1, MPI_COMM_WORLD);
+                anomalous_proc, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
     else 
     {

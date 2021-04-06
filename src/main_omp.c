@@ -1,5 +1,5 @@
 #include "dbg.h"
-#include "omp_impl.h"
+#include "impl_omp.h"
 
 #include <getopt.h>
 #include <inttypes.h>
@@ -79,7 +79,7 @@ main(int argc, char *argv[])
          m2_path[buffersize];// = { 0 };
          //out_path[buffersize] = { 0 };  // fixed size buffers
     FILE *m1_file = NULL, *m2_file = NULL;
-    int widthi;
+    int widthi, index, threadcount;
     implementation_t mulfunc; 
 
     if (argc < 9)
@@ -91,7 +91,6 @@ main(int argc, char *argv[])
     while(1)
     {
         int opt = getopt_long(argc, argv, "hl:r:t:w:i:", longopts, 0);
-        int index;
         if (opt == -1) break;
 
         switch(opt)
@@ -131,8 +130,9 @@ main(int argc, char *argv[])
             case('t'):
                 // no return value, I hope that its error handling is robust
                 input_flags.thread_flag = 1;
-                debug("Setting number of threads to %d", atoi(optarg));
-                omp_set_num_threads(atoi(optarg));
+                threadcount = atoi(optarg);
+                debug("Setting number of threads to %d", threadcount);
+                omp_set_num_threads(threadcount);
                 break;
             case('?'):
                 help_flag = 1;
@@ -236,7 +236,7 @@ main(int argc, char *argv[])
     debug("my_err: %d", my_err);
     check(my_err == 0, "Something went wrong during matrix multiplication");
     const double exec_wall_time = end_time - start_time;
-    fprintf(stderr, "%lf\n", exec_wall_time);
+    fprintf(stderr, "%d %d %lf\n", index, threadcount, exec_wall_time);
 
     debug("Returned from matrix multiplication");
     debug("Printing product matrix to stdout");

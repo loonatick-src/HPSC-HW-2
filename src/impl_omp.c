@@ -1,5 +1,5 @@
 #include "dbg.h"
-#include "omp_impl.h"
+#include "impl_omp.h"
 
 #include <inttypes.h>
 #include <omp.h>
@@ -17,6 +17,7 @@ matMulSquare_baseline_omp(const double *M_1,
     const uint32_t matrix_size = width * width;
     check(matrix_size >= width, "Integer overflow (uint32_t).");
     debug("%u %u", width, matrix_size);
+#   pragma omp parallel for
     for (uint32_t row = 0; row < width; row++)
     {
         for (uint32_t col = 0; col < width; col++)
@@ -25,7 +26,6 @@ matMulSquare_baseline_omp(const double *M_1,
             double elmt_sum = 0.0l;
             // OpenMP implementation parallelizes the calculation of
             // individual matrix elements of the product matrix
-#           pragma omp parallel for reduction(+:elmt_sum)
             for (uint32_t i = 0; i < width; i++) 
             {
                 elmt_sum += M_1[row*width + i] * M_2[i*width + col];
@@ -63,9 +63,9 @@ matMulSquare_transpose_omp(const double *M_1,
     check_mem(M_2trnsps);
 
     // parallelized matrix transposition
+#   pragma omp parallel for
     for (uint32_t row = 0; row < width; row++ )
     {
-#       pragma omp parallel for
         for (uint32_t col = 0; col < width; col++)
         {
             M_2trnsps[col * width + row] = M_2[row * width + col]; 
@@ -74,13 +74,13 @@ matMulSquare_transpose_omp(const double *M_1,
 
     // matrix multiplication, taking into account transposition
     // of M_2
+#   pragma omp parallel for
     for (uint32_t row = 0; row < width; row++) 
     {
         for (uint32_t col = 0; col < width; col++)
         {
             const uint32_t i_p = row * width + col;
             double elmt_sum = 0.0l;
-#           pragma omp parallel for reduction(+:elmt_sum)
             for (uint32_t i = 0; i < width; i++)
             {
                 elmt_sum += M_1[row*width + i]*M_2trnsps[col * width + i];
@@ -108,13 +108,13 @@ matMulSquare_pretranspose_omp(const double *M_1,
     const uint32_t matrix_size = width * width;
     check(matrix_size >= width, "Integer overflow (uint32_t).");
     
+#   pragma omp parallel for
     for (uint32_t row = 0; row < width; row++)
     {
         for (uint32_t col = 0; col < width; col++)
         {
             const uint32_t i_p = row * width + col;
             double elmt_sum = 0.0l;
-#           pragma omp parallel for reduction(+:elmt_sum)
             for (uint32_t i = 0; i < width; i++)
             {
                 elmt_sum += M_1[row*width + i] * M_2[col*width + i];
@@ -127,8 +127,3 @@ matMulSquare_pretranspose_omp(const double *M_1,
 error:
     return -1;
 }
-
-
-// TODO: Incorporate ideas from Hopkins chapter 1
-// TODO: Add another imlementation - the algorithm in Cormen
-

@@ -26,10 +26,10 @@ const uint32_t width = 100;
 const uint32_t matsize = width * width;
 const uint32_t memsize = matsize * sizeof(double);
 const double threshold_percent_error = 1.e-2;
-const char *m1_path = "m_1_100.dat";
-const char *m2_path = "m_2_100.dat";
-const char *mmulpath = "matmul_100.dat";
-const char *mmulpatht = "matmul_100t.dat";
+const char *m1_path = "m_1/m_1_100.dat";
+const char *m2_path = "m_2/m_2_100.dat";
+const char *mmulpath = "matmul/matmul_100.dat";
+const char *mmulpatht = "matmul/matmul_100t.dat";
 
 
 int
@@ -109,7 +109,7 @@ test_matmul_omp()
 
     // First implementation
     log_info("Testing first implementation (direct multiplication)");
-    int my_err = matMulSquare_baseline(m1, m2, p, width);
+    int my_err = matMulSquare_baseline_omp(m1, m2, p, width);
     check(!my_err, "Something went wrong in the first implementation");
     my_err = validate_matrix(p, matmul, matsize);
     check_debug(!my_err, "Output of first implementation seems erroneous");
@@ -118,7 +118,7 @@ test_matmul_omp()
 
     // Second implementation
     log_info("Testing second implementation (transposed multiplication)");
-    my_err = matMulSquare_transpose(m1, m2, p, width);
+    my_err = matMulSquare_transpose_omp(m1, m2, p, width);
     check(!my_err, "Something went wrong in the second implementation");
     my_err = validate_matrix(p, matmul, matsize);
     check(!my_err, "Output of second implementation seems erroneous");
@@ -134,7 +134,7 @@ test_matmul_omp()
     fclose(matmul_file);
 
     log_info("Testing third implementation (pretransposed multiplication");
-    my_err = matMulSquare_pretranspose(m1, m2, p, width);
+    my_err = matMulSquare_pretranspose_omp(m1, m2, p, width);
     check(!my_err, "Something went wrong with the third implementation");
     my_err = validate_matrix(p, matmul, matsize);
     check(!my_err, "Third implementation seems erroneous");

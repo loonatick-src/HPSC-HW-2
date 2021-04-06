@@ -22,12 +22,13 @@ typedef struct {
 
 
 flags_t input_flags = { 0, 0, 0, 0 };
+const size_t buffersize = 128;
 
 
 const implementation_t implementations[] = {
-    matMulSquare_baseline,
-    matMulSquare_transpose,
-    matMulSquare_pretranspose };
+    matMulSquare_baseline_omp,
+    matMulSquare_transpose_omp,
+    matMulSquare_pretranspose_omp };
 const int num_impl = sizeof(implementations) / sizeof(implementation_t);
 
 int help_flag = 0;
@@ -74,7 +75,9 @@ int
 main(int argc, char *argv[])
 {
     double *M_1 = NULL, *M_2 = NULL, *P = NULL;
-    char m1_path[128] = { 0 }, m2_path[128] = { 0 };  // fixed size buffers
+    char m1_path[buffersize],// = { 0 },
+         m2_path[buffersize];// = { 0 };
+         //out_path[buffersize] = { 0 };  // fixed size buffers
     FILE *m1_file = NULL, *m2_file = NULL;
     int widthi;
     implementation_t mulfunc; 
@@ -115,13 +118,13 @@ main(int argc, char *argv[])
                 break;
             case('l'):
                 input_flags.lmat_flag = 1;
-                strncpy(m1_path, optarg, sizeof(m1_file));
-                m1_path[sizeof(m1_file) - 1] = '\0';
+                strncpy(m1_path, optarg, buffersize);
+                m1_path[buffersize - 1] = '\0';
                 debug("Left matrix filename: %s", m1_path);
                 break;
             case('r'):
-                strncpy(m2_path, optarg, sizeof(m2_file));
-                m2_path[sizeof(m2_path) - 1] = '\0';
+                strncpy(m2_path, optarg, buffersize);
+                m2_path[buffersize - 1] = '\0';
                 input_flags.rmat_flag = 1;
                 debug("Right matrix file name: %s", m2_path);
                 break;
@@ -190,8 +193,8 @@ main(int argc, char *argv[])
 
 
     // reading matrix elements from file
+    debug("Opening file %s for reading M1", m1_path);
     m1_file = fopen(m1_path, "r");
-    debug("Opening file for reading M1");
 
     uint32_t in_count = 0;
     double melmnt;
@@ -227,9 +230,13 @@ main(int argc, char *argv[])
 
 
     debug("Performing matrix multiplication");
+    const double start_time = omp_get_wtime();
     int my_err = mulfunc(M_1, M_2, P, width);
+    const double end_time = omp_get_wtime();
     debug("my_err: %d", my_err);
     check(my_err == 0, "Something went wrong during matrix multiplication");
+    const double exec_wall_time = end_time - start_time;
+    fprintf(stderr, "%lf\n", exec_wall_time);
 
     debug("Returned from matrix multiplication");
     debug("Printing product matrix to stdout");

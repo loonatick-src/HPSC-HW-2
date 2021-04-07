@@ -2,9 +2,13 @@
 #include "impl_omp.h"
 
 #include <inttypes.h>
+#include <math.h>
 #include <omp.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+#define mel(A, w, i, j) A[i*w + j]  // get matrix element row,col
+#define submel(A, w, s, r, c) A[(r+s)*w + c + s]  // get principal submatrix element at row,col
 
 
 int
@@ -126,4 +130,92 @@ matMulSquare_pretranspose_omp(const double *M_1,
     return 0;
 error:
     return -1;
+}
+
+
+double
+norm_l2(double *vector, uint32_t dim)
+{
+    double rv = 0.0l
+#   pragma omp parallel for reduction(+:rv)
+    for(uint32_t i = 0; i < dim; i++)
+    {
+        rv += vector[i] * vector[i];
+    }
+    return (sqrt(rv));
+}
+
+
+double
+inner_product(double *v_1, double *v_2, uint32_t dim)
+{
+    double rv = 0.0l
+#   pragma omp parallel for reduction(+:rv)
+    for (uint32_t i = 0; i < dim; i++)
+    {
+        rv += v_1[i] * v_2[i];
+    }
+
+    return rv;
+}
+
+
+int
+eye_calloc(double *matrix, uint32_t width)
+{
+    check_mem(matrix);
+#   pragma omp parallel for shared(matrix)
+    for (uint32_t i = 0; i < width; i++)
+    {
+        matrix[i*width + i] = 1.0l;
+    }
+    return EXIT_SUCCESS;
+error:
+    return EXIT_FAILURE;
+}
+
+
+int
+unit_vector(const double *vector_in, double *vector_out, uint32_t width)
+{
+    check_mem(vector_in);
+    check_mem(vector_out);
+    double norm = norm_l2(vector_in, width);
+    check(norm > 0, "Null vector passed");
+#   pragma omp parallel for shared(vector_out)
+    for (uint32_t i = 0; i < width; i++)
+    {
+        vector_out[i] = vector_in[i]/norm;
+    }
+    return EXIT_SUCCESS;
+error:
+    return EXIT_FAILURE;
+}
+
+
+int
+unit_vector_inplace(double *vector, uint32_t width)
+{
+    check_mem(vector);
+    double norm = norm_l2(vector, width);
+    check(norm > 0, "Null vector passed");
+    for (uint32_t i = 0; i < width; i++)
+    {
+        vector[i]/=norm;
+    }
+    return EXIT_SUCCESS;
+error:
+    return EXIT_FAILURE;
+}
+
+
+int
+eye_col_calloc(double *vector, uint32_t width, uint32_t n)
+{
+    check_mem(vector);
+    vector[n] = 1.0l;
+    return EXIT_SUCCESS;
+
+error:
+    return EXIT_FAILURE;
 }

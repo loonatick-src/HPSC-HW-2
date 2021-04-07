@@ -1,4 +1,5 @@
 #include "dbg.h"
+#include "impl_mpi.h"
 #include <inttypes.h>
 #include <mpi.h>
 #include <stdint.h>

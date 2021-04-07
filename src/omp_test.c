@@ -1,13 +1,7 @@
 #include "dbg.h"
+#include "impl_omp.h"
 
-#ifdef _MPI_TEST
-#include <mpi.h>
-#include "mpi_impl.h"
-#endif
-#ifdef _OMP_TEST
 #include <omp.h>
-#include "omp_impl.h"
-#endif
 #include <math.h>
 #include <inttypes.h>
 #include <stdint.h>
@@ -22,14 +16,14 @@
 #define EXIT_FAILURE -1
 #endif
 
-const uint32_t width = 100;
+const uint32_t width = 1000;
 const uint32_t matsize = width * width;
 const uint32_t memsize = matsize * sizeof(double);
 const double threshold_percent_error = 1.e-2;
-const char *m1_path = "m_1/m_1_100.dat";
-const char *m2_path = "m_2/m_2_100.dat";
-const char *mmulpath = "matmul/matmul_100.dat";
-const char *mmulpatht = "matmul/matmul_100t.dat";
+const char *m1_path = "m_1/m_1_1000.dat";
+const char *m2_path = "m_2/m_2_1000.dat";
+const char *mmulpath = "matmul/matmul_1000.dat";
+const char *mmulpatht = "matmul/matmul_1000t.dat";
 
 
 int
@@ -74,13 +68,10 @@ validate_matrix(double *v, double *a, uint32_t matsize)
 }
 
 
-#ifdef _OMP_TEST
 void
 test_matmul_omp()
 {
-#ifdef _OPENMP
     omp_set_num_threads(6);
-#endif
     log_info("Testing OpenMP matrix multiplication implementations");
     log_info("Allocating space for matrices");
     double *m1 = (double *)malloc(memsize);
@@ -142,7 +133,6 @@ test_matmul_omp()
 
 #ifdef _OPENMP
     log_info("Testing of OpenMP implementations completed successfully");
-#endif
 
     free(m1);
     free(m2);
@@ -178,7 +168,7 @@ test_matmul_mpi()
 
     check(num_procs > 0, "Call to MPI_Comm_rank failed");
     debug("%d: num_procs = %d", proc_rank, num_procs); 
-    const int n = 100;
+    const int n = 1000;
     const int nn = n * n;
     if (proc_rank == 0) 
     {
@@ -238,12 +228,6 @@ error:
 
 int main(int argc, char *argv[])
 {
-#ifdef _OMP_TEST
     test_matmul_omp();
-#endif
-
-#ifdef _MPI_TEST
-    test_matmul_mpi();
-#endif
     return 0;
 }

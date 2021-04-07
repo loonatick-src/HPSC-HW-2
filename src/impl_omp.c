@@ -10,6 +10,8 @@
 #define mel(A, w, i, j) A[i*w + j]  // get matrix element row,col
 #define submel(A, w, s, r, c) A[(r+s)*w + c + s]  // get principal submatrix element at row,col
 
+#define SGN64(A) ((0x9000000000000000&(A))>>63)
+
 
 int
 matMulSquare_baseline_omp(const double *M_1,
@@ -134,9 +136,9 @@ error:
 
 
 double
-norm_l2(double *vector, uint32_t dim)
+norm_l2(const double *vector, uint32_t dim)
 {
-    double rv = 0.0l
+    double rv = 0.0l;
 #   pragma omp parallel for reduction(+:rv)
     for(uint32_t i = 0; i < dim; i++)
     {
@@ -149,7 +151,7 @@ norm_l2(double *vector, uint32_t dim)
 double
 inner_product(double *v_1, double *v_2, uint32_t dim)
 {
-    double rv = 0.0l
+    double rv = 0.0l;
 #   pragma omp parallel for reduction(+:rv)
     for (uint32_t i = 0; i < dim; i++)
     {

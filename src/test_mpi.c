@@ -88,6 +88,7 @@ int main(int argc, char *argv[])
         free(p);
     }
     debug_mpi(proc_rank, "Exit success");
+    MPI_Finalize();
     return EXIT_SUCCESS; 
 error:
     if (m1) free(m1);

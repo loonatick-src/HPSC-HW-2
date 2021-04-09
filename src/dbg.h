@@ -11,13 +11,16 @@
 
 #ifdef NDEBUG
 #define debug(M, ...)
-#define mpi_debug(R, M, ...)
+#define debug_mpi(R, M, ...)
+#define debug_mpi_root(R, M, ...)
 #else
 #define debug(M, ...) fprintf(stderr, "DEBUG %s:%d " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
-
-#define mpi_debug(R, M, ...) if ((R) == 0) { debug(M, ##__VA_ARGS__); }
+#define debug_mpi(R, M, ...) debug("Process %d: " M, R, ##__VA_ARGS__)
+#define debug_mpi_root(R, M, ...) if (R == 0) { debug_mpi(R, M, ##__VA_ARGS__);  }
 #endif
 
+
+#define debu
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 
 #define log_err(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)

@@ -50,16 +50,19 @@ int main(int argc, char *argv[])
     int mat_size = width * width;
     int my_err;
 
+#ifdef BALANCED_BASE
+    my_err = matMulSquare_balanced_mpi(m1, m2, p, width, proc_rank, num_procs);
+#endif
 #ifdef TRANSPOSE
     my_err = matMulSquare_transpose_mpi(m1, m2, p, width, proc_rank, num_procs);
 #endif
 #ifdef BASELINE
     my_err = matMulSquare_baseline_mpi(m1, m2, p, width, proc_rank, num_procs);
-    check(!my_err, "Process %d: Something went wrong in matMul", proc_rank);
 #endif
 #ifdef PRETRANSPOSE
     my_err = matMulSquare_pretranspose_mpi(m1, m2, p, width, proc_rank, num_procs);
 #endif
+    check(!my_err, "Process %d: Something went wrong in matMul", proc_rank);
     if (proc_rank == 0) {
         for (int i = 0; i < mat_size; i++)
         {

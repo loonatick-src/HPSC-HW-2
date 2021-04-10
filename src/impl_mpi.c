@@ -13,7 +13,6 @@ matMulSquare_baseline_mpi(const double *M_1, double *M_2,
         int proc_rank, int num_procs)
 {
     int num_rows_per_proc = width / num_procs;
-    const int unbalanced_proc = num_procs - 1;
     if (proc_rank == 0)
     {
         check_mem(M_1); check_mem(M_2); check_mem(P);

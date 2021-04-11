@@ -21,11 +21,9 @@ matMulSquare_pretranspose_mpi(ARGUMENT_SIGNATURE);
 int
 matMulSquare_balanced_mpi(ARGUMENT_SIGNATURE);
 
-
-implementations_t methods = { matMulSquare_baseline_mpi,
-                              matMulSquare_balanced_mpi,
-                              matMulSquare_transpose_mpi,
-                              matMulSquare_pretranspose_mpi };
-
-const int implementation_count = sizeof(methods)/sizeof(implementation_t);
+/*
+int
+gaussian_elimination_naive(double *M, int width,
+        int proc_rank, int num_procs);
+        */
 #endif

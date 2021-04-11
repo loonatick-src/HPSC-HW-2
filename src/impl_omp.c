@@ -12,6 +12,11 @@
 
 #define SGN64(A) ((0x9000000000000000&(A))>>63)
 
+typedef struct {
+    double g;
+    double s;
+} givens_t;
+
 
 int
 matMulSquare_baseline_omp(const double *M_1,
@@ -19,6 +24,7 @@ matMulSquare_baseline_omp(const double *M_1,
                       double *P, 
                       const uint32_t width) 
 {
+    check_mem(M_1); check_mem(M_2); check_mem(P);
     debug("Performing matrix multiplication for %d x %d matrices", width, width);
     const uint32_t matrix_size = width * width;
     check(matrix_size >= width, "Integer overflow (uint32_t).");
@@ -220,4 +226,118 @@ eye_col_calloc(double *vector, uint32_t width, uint32_t n)
 
 error:
     return EXIT_FAILURE;
+}
+
+
+givens_t
+givens_coefficients(double a, double b) 
+{
+    givens_t rv = { 0.0l, 0.0l };
+    check(a != 0, "Singularity warning bruh");
+    double t = b/a;
+    rv.g = (1.0l/sqrt(1 + t * t));
+    rv.s = rv.g * t;
+    return rv;
+error:
+    return rv;
+}
+
+
+int
+givens_matrix(double *eye, uint32_t width, uint32_t row,  givens_t coefficients)
+{
+    // assumes that an identity matrix has been provided
+    check_mem(eye);
+    eye[row*width + row] = coefficients.g;
+    eye[row*width + row + 1] = coefficients.s;
+    eye[(row+1)*width + row] = -coefficients.s;
+    eye[(row+1)*width + row + 1] = coefficients.g;
+    return 0;
+error:
+    return -1;
+}
+
+
+int
+revert_givens_matrix(double *eye, uint32_t width, uint32_t row)
+{
+    check_mem(eye);
+    uint32_t index = row*width + row;
+    eye[index] = 1.0l;
+    eye[index+1] = 0.0l;
+    eye[index + width + 1] = 1.0l;
+    eye[index + width] = 0.0l;
+    return 0;
+error:
+    return -1;
+}
+
+
+int 
+matrix_copy(double *source, double *destination, uint32_t width)
+{
+    check_mem(source);
+    check_mem(destination);
+#   pragma omp parallel for
+    for (uint32_t i = 0; i < width*width; i++)
+    {
+        destination[i] = source[i];
+    }
+    return 0;
+error:
+    return -1;
+}
+
+
+int
+QR_decomposition_inplace(double *M, double *R, double *eye, uint32_t width)
+{
+    check_mem(M);
+    check_mem(R);
+    check_mem(eye);
+    matrix_copy(M, R, width);
+    for (uint32_t col = 0; col < width; col++)
+    {
+        double *temp = R;
+        for (uint32_t row = width-1; row > col; row--)
+        {
+            givens_t coefficients = givens_coefficients(M[(row-1)*width + col], M[row*width + col]);
+            givens_matrix(eye, width, row-1, coefficients);
+            matMulSquare_baseline_omp(eye, R, M, width);
+            revert_givens_matrix(eye, width, row-1);
+            // switching pointers so that we don't lose them
+            temp = R;
+            R = M;
+            M = temp;
+        }
+    }
+
+    return 0;
+error:
+    return -1;
+}
+
+
+int
+gaussian_elimination_naive_inplace(double *M, uint32_t width)
+{
+    check_mem(M);
+    for (uint32_t iter = 0; iter < width - 1; iter++) 
+    {
+        double pivot = M[iter * width + iter];
+        check(pivot != 0, "Zero pivot found! Use partial pivoting algo.");
+#       pragma omp parallel for
+        for (uint32_t row = iter+1; row < width; row++)
+        {
+            double leverage = M[row*width + iter];  // LOL
+            for (uint32_t col = iter + 1; col < width; col++)
+            {
+                M[row*width + col] -= leverage/pivot;
+            }
+            M[row * width + iter] = 0.0l;
+        }
+    }
+    return 0;
+error:
+    return -1;
 }

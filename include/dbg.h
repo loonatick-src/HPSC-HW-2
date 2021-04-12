@@ -2,8 +2,9 @@
 #define _MY_DEBUG_H
 
 /* Useful debugging macros
- * taken directly from Zed Shaw's
- * Learn C the Hard Way */
+ * taken from Zed Shaw's
+ * Learn C the Hard Way 
+ * with a few custom additions */
 
 #include <stdio.h>
 #include <errno.h>

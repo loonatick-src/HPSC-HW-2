@@ -1,5 +1,10 @@
 *.swp
-*.out
+*.out*
 *.o
 *.pdf
 *.dat
+*.png
+*synctex.gz
+*minted_main/
+*.fls
+*.aux

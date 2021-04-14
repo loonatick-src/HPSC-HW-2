@@ -1,0 +1,258 @@
+\documentclass[a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{textcomp}
+\usepackage[english]{babel}
+\usepackage{amsmath, amssymb}
+\usepackage{caption}
+\usepackage{minted}
+
+
+% figure support
+\usepackage{import}
+\usepackage{xifthen}
+\pdfminorversion=7
+\usepackage{pdfpages}
+\usepackage{transparent}
+\newcommand{\incfig}[1]{%
+    \def\svgwidth{\columnwidth}
+    \import{./figures/}{#1.pdf_tex}
+}
+\newcommand{\hcut}{\hbar}
+
+\pdfsuppresswarningpagegroup=1
+\newenvironment{code}{\captionsetup{type=listing}}{}
+\title{ME 766 - HW2\\Preliminary Report}
+\date{}
+
+\begin{document}
+\maketitle{}
+This is a preliminary report on a work in progress assignment.  
+The source code can be found at \texttt{github.com/loonatick-src/HPSC-HW-2}.
+
+\section*{Matrix Multiplication}
+\subsection*{OpenMP}
+Three basic implementations of matrix multiplication have been
+made, keeping in mind the memory hierarchy of CPUs.
+
+\subsubsection*{Baseline}
+Straightforward matrix multiplication with the outermost loop
+parallelized using the pragma \texttt{omp parallel for}. 
+
+This results in uncoalesced memory access for the right matrix
+as the entries are accessed in column-major order, which for
+large enough matrix widths would result in L1 cache misses and
+LL (last level, L3 on my machine) misses for still larger
+matrices.
+
+Behaviour of cache and memory access is simulated using cachegrind. 
+ 
+\begin{code}
+\inputminted[samepage=false, breaklines, firstline=21, lastline=53]{c}{../src/impl_omp.c}
+\label{lst:matmul_omp_baseline}
+\caption{Baseline implementation of matrix multiplication using OpenMP}
+\end{code}
+\subsubsection*{Transpose the Right Matrix}
+The right matrix is transposed before matrix multiplication is
+performed. This makes the element access for the right matrix
+column-major.
+
+The tradeoff between this memory access pattern and the
+overhead of transposing the matrix will be studied. Using
+both timing codes and cachegrind.
+
+\begin{code}
+\inputminted[samepage=false, breaklines, firstline=56, lastline=111]{c}{../src/impl_omp.c}
+\label{lst:matmul_omp_transpose}
+\caption{First optimization attempt - transpose the right matrix before multiplication}
+\end{code}
+
+\subsubsection*{Pretransposed Right Matrix}
+Assuming the end user of the code provides a pretransposed right
+matrix. This implementation will be faster than both the baselilne
+and the first optimization. What remains to be studied is the
+problem size at which the speedup starts becoming significant.
+
+Again, cachegrind will be used to simulate access to caches.
+
+\begin{code}
+\inputminted[samepage=false, breaklines,  firstline=114, lastline=141]{c}{../src/impl_omp.c}
+\label{lst:matmul_omp_pretranspose}
+\caption{Second optimization - assuming the right matrix is
+already transposed}
+\end{code}      
+ 
+\subsection*{MPI}
+Four implementations keeping in mind the memory hierarchy.
+
+\subsubsection*{Baseline}
+This is an iteration of the first code that I wrote, wherein I
+calculated the number of rows to be sent to each process using
+integer division and then sent the remaining rows to a single process.
+Only the left matrix was scattered using \texttt{MPI\_Scatterv} 
+while the right matrix was broadcasted as a whole.
+
+This implementation does not do a good job of load balancing as
+there is an obvious bottleneck at the process that receives the most
+rows of the left matrix. The first optimization solves this problem.
+
+\begin{code}
+\inputminted[samepage=false, breaklines, linenos, firstline=10, lastline=103]{c}{../src/impl_mpi.c}
+\label{lst:matmul_mpi_baseline}
+\caption{Baseline MPI implementation - bad load balancing}
+\end{code}
+
+\subsubsection*{Balanced}
+After calculating the leftover rows \texttt{r = width - width/num\_procs * num\_procs} post integer division,
+\texttt{1} was added to $r$ elements of \texttt{sendcounts}.
+
+\begin{code}
+\inputminted[samepage=false, breaklines, linenos, firstline=106, lastline=206]{c}{../src/impl_mpi.c}
+\label{lst:matmul_mpi_balanced}
+\caption{MPI matrix muliplication with better load balancing}
+\end{code}
+
+\subsubsection*{Transpose and Pretranspose}
+Similar to the OpenMP implementations, transpositions of the right
+matrix were considered.
+
+\section*{Profiling and Debugging}
+\subsection*{Valgrind - cachegrind}
+Cachegrind is another tool from the valgrind suite. It
+instruments the binary (that has been compiled with debugging
+symbols, i.e. \texttt{-g} in gcc) in order to simulate access
+to caches.
+
+It can report the  number of cache read/write misses on a per-function basis
+
+The code being instrumented runs \textit{much slower}, because
+of the overhead of instrumentation and forced serialization of
+multithreaded sections.
+
+For this assignment we are only interested in cache hit rates
+(cachegrind also simulates branch prediction, but this code
+has very little branching, both conditional and indirect).
+
+We will require the following metrics from cachegrind
+\begin{itemize}
+    \item I cache reads (\texttt{Ir}, number of instructions executed), I1 cache read misses (\texttt{I1mr}) and LL cache instruction read misses (\texttt{Ilmr})
+    \item D cache reads (\texttt{Dr}, number of memory reads), D1 cache read misses (\texttt{D1mr}) and LL cache data read misses (\texttt{LDmr})
+    \item D cache writes (\texttt{Dw}, number of memory writes),
+        D1 cache write misses (\texttt{D1wr}), and LL cache data write misses (\texttt{DLmw}).
+\end{itemize}
+
+\subsubsection*{Cachegrind with OpenMP Matrix Multiplications}
+The full output of cachegrind and cg\_annotate is a fairly large
+table. Including only the commentary for the sake of brevity.
+
+A minimal output file of cg\_annotate looks like the screenshot
+in figure \ref{fig:fig-cg_annotate-png}
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1.0\textwidth]{fig/cg_annotate.png}
+    \caption{Minimal output file of cg\_annotate on cachegrind's output file}
+    \label{fig:fig-cg_annotate-png}
+\end{figure}
+
+Valgrind outputs the following commentaries for the OpenMP matrix
+multiplication implementations. \textbf{Notice the D1 miss rate in each of the outputs}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.8\textwidth]{fig/cachegrind_baseline.png}
+    \caption{Baseline implementation for 1000 x 1000 matrices}
+    \label{fig:fig-cachegrind_baseline-png}
+\end{figure}
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.8\textwidth]{fig/cachegrind_o1.png}
+    \caption{Transposition implementation for the same 1000 x 1000 matrix}
+    \label{fig:fig-cachegrind_o1-png}
+\end{figure}    
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.8\textwidth]{fig/cachegrind_o2.png}
+    \caption{Pretransposed right matrix implementation for the same 1000 x 1000 matrix}
+    \label{fig:fig-cachegrind_o2-png}
+\end{figure}
+
+Since these matrices are small, the LL cache miss rate is zero.
+Simulating larger matrices would require a lot of time. The end
+goal is to simulate with matrices larger than what would fit
+in the L3 cache of my computer, and then see whether the any further optimizations are possible.
+
+Most likely optimizations are to be found in Gaussian elimination and
+QR decomposition.
+
+\subsection*{Valgrind - memcheck}
+Memcheck is a tool from the valgrind suite of tools. It was used
+for debugging and identifying memory leaks. The OS is
+supposed to free resources allocated to the process upon
+receiving an interrupt signal like SIGSEGV. 
+
+But, I have tried to write my code very defensively and
+completely avoid segfaults altogether. This
+means that if anything else goes wrong during program execution,
+I will have to exit gracefully while freeing all resources
+on my own.
+
+Memcheck is extremely helpful in identifying blocks of memory
+that may have been lost. While most cases were just things like
+\texttt{malloc} - \texttt{free} pairs, a noteworthy (in my opinion)
+unsafe pointer usage is done in my MPI implementation of gaussian
+elimination (WIP); I allowed the \texttt{(void *)recv\_\_buf}
+argument of the root process in \texttt{MPI\_\_Scatterv} to
+overlap with the matrix's internal memory, i.e. made it an
+indirect pointer to the matrix memory (See lines 464 and 489
+of listing below.
+
+\begin{code}
+\inputminted[samepage=false, breaklines, linenos, firstline=461, lastline=496]{c}{../src/impl_mpi.c}
+\label{lst:mpi_gauss}
+\caption{A part of the gaussian elimination implementation in MPI}
+\end{code}
+
+
+\section*{Other potential implementations}
+\subsection*{QR Decomposition}
+
+
+\subsection*{Strassen's Algorithm}
+Strassen's algorithm was the first sub-$\mathcal{O}(n^3)$ matrix
+multiplication algorithm to be discovered; it's asymptotic
+complexity is $\approx\mathcal{O}(n^{2.8})$.
+
+Ths gist of the algorithm is that instead of recursively
+breaking down the problem into matrix-product of 8 submatrices,
+one breaks it down to seven matrix-products and a set of
+matrix additions and subtractions. 
+
+The trade-offs between this and traditional matrix product are
+significant. This algorithm requires a lot more memory because
+of numerous intermediate matrices.
+The constants in the execution time of this algorithm in the
+RAM model are very large and thus a serial implementation of
+this algorithm becomes faster than traditional matrix only
+for very large problem sizes.
+
+So, what remains to be seen is whether it is possible to
+get this problem size threshold down by parallelization.
+Being recursive, implementing it using OpenMP pragmas.
+
+I have not yet looked into literature on multithreaded/parallel
+implementations of Strassen's algorithm, or even matrix
+multilpication in general. I would like to try this on my
+own before the assignment deadline.
+
+
+\section*{Appendix}
+\subsection*{Debugging Macros}
+\begin{code}
+\inputminted[samepage=false, breaklines, linenos]{c}{../include/dbg.h}
+\label{lst:dbg_h}
+\caption{Debugging macros used in the source code}
+\end{code}      
+
+   
+\end{document}

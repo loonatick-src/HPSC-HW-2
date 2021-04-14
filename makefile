@@ -1,7 +1,7 @@
-CFLAGS = -Wall -Winline -pedantic -g -Iinclude
+CFLAGS = -Wall -Wextra -Winline -pedantic -g -Iinclude
 LDLIBS = -lm
 
-mpi: CFLAGS = -Wall -Winline -pedantic -g -Iinclude
+mpi: CFLAGS = -Wall -Wextra -Winline -pedantic -g -Iinclude
 mpi:
 	mpicc $(CFLAGS) src/impl_mpi.c src/test_mpi.c -o bin/mpi.out $(LDLIBS)
 

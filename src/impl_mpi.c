@@ -6,6 +6,11 @@
 
 #define NOT_IMPLEMENTED 30
 
+#ifdef DNDEBUG
+#define debug_proc(R, M, ...) 
+#else
+#define debug_proc(R, M, ...) if (proc_rank == (R)) debug_mpi(R, M, ##__VA_ARGS__)
+#endif
 
 int
 matMulSquare_baseline_mpi(const double *M_1, double *M_2,
@@ -402,113 +407,126 @@ error:
 
 
 int
-gaussian_elimination_naive(double *M, /*double *P,*/ int width,
+gaussian_elimination_naive_inplace(double *M, /*double *P,*/ int width,
         int proc_rank, int num_procs)
 {
-    int mpi_init_flag;
-    int *send_counts = NULL, *displacements = NULL;
-    double *send_buf = NULL, *recv_buf = NULL;
-    int mpi_err = MPI_Initialized(&mpi_init_flag);
-    check(!mpi_err, "`call to `MPI_Initialized` returned with error. Aborting.");
-    check(mpi_init_flag, "MPI not initialized. Aborting.");
-    check(width > 0, "Non-positive width.");
-
     if (proc_rank == 0)
-    {
         check_mem(M);
-        // check_mem(P);
-    }
+    double *pivot_buf = NULL, *proc_buf = NULL;
+    int *send_counts = NULL, *displacements = NULL;
+    debug_proc(0, "Commencing gaussian elimination");
 
-    send_counts = (int *)malloc(sizeof(int) * num_procs);
-    displacements = (int *)malloc(sizeof(int) * num_procs);
+    send_counts = (int *) malloc(sizeof(int) * num_procs);
+    check_mem(send_counts);
+    displacements = (int *) malloc(sizeof(int) * num_procs);
+    check_mem(send_counts);
+
+    int rows_per_proc = width / num_procs;
+    int unbalanced_num_rows = width - num_procs * (width / num_procs);
     displacements[0] = 0;
 
-    int base_num_rows = width / num_procs;
-    int unbalanced_num_rows = width % num_procs;
-
-    for (int proc = 0; proc < num_procs-1; proc++)
+    for (int i = 0; i < num_procs-1; i++)
     {
-        send_counts[proc] = base_num_rows * width;
+        send_counts[i] = rows_per_proc * width;
         if (unbalanced_num_rows != 0)
         {
-            send_counts[proc] += width;
+            send_counts[i] += width;
             unbalanced_num_rows--;
         }
-        displacements[proc+1] = displacements[proc] + send_counts[proc];
+        displacements[i+1] = displacements[i] + send_counts[i];
     }
-    send_counts[num_procs-1] = base_num_rows * width;
+    send_counts[num_procs-1] = rows_per_proc * width;
 
+    pivot_buf = (double *) malloc(width * sizeof(double));
+    check_mem(pivot_buf);
+    proc_buf = (double *) malloc(send_counts[proc_rank] * sizeof(double));
+    check_mem(proc_buf);
 
-    recv_buf = (double *)malloc(send_counts[proc_rank] * sizeof(double));
-    check_mem(recv_buf);
-        
+    // scattering the matrix to all processes
+    int mpi_err = MPI_Scatterv(M, send_counts, displacements,
+            MPI_DOUBLE, proc_buf, send_counts[proc_rank],
+            MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    check(!mpi_err, "Call to `MPI_Scatterv` returned with error");
 
-    mpi_err = MPI_Scatterv(M, send_counts, displacements,
-            MPI_DOUBLE, recv_buf, send_counts[proc_rank],
-            MPI_DOUBLE, 0, MPI_COMM_WORLD);  
-
-    //for (int i = 0; i < send_counts[proc_rank]; i++)
-    //{
-    //   debug_mpi(proc_rank, "recv_buf[%d] = %lf", i, recv_buf[i]);
-    //}
-
-    
-    send_buf = (double *)malloc(width * sizeof(double));
-    int iter = 0;
-    int proc = 0;
-    while (proc < num_procs);
+    // iterating over rows of the matrix
+    // each row except the last becomes the pivot row
+    int pivot_row = 0, pivot_proc = 0;
+    double *temp = NULL;
+    while (pivot_row < width - 1)
     {
-        for (int row = 0; row < send_counts[proc]/width; row++)
+        if (proc_rank == pivot_proc)
         {
-            void *temp = NULL; 
-            if (proc_rank == proc)
-            {
-                temp = send_buf;
-                send_buf = recv_buf + width*row;
-            }
-
-            // broadcasting the pivot row
-            MPI_Bcast(send_buf, width, MPI_DOUBLE,
-                    proc, MPI_COMM_WORLD);
-
-            double pivot = send_buf[iter];
-            // TODO: do threshold check instead
-            check(pivot != 0.0l, "Zero pivot found. Aborting (use partial pivoting algorithm).")
-            if (proc_rank > proc)
-            {
-                for (int i = 0; i < send_counts[proc_rank]/width; i++)
-                {
-                    double factor = recv_buf[i * width + iter]/pivot;
-                    recv_buf[i*width + iter] = 0.0l;
-                    for (int j = iter + 1; j < width; j++)
-                    {
-                        recv_buf[i * width + j] -= send_buf[j]*factor;
-                    }
-                }
-            }
-            if (proc_rank == proc)
-            {
-                send_buf = temp;
-            }
-            iter++;
-            if (iter == width-1)
-                break;
+            temp = pivot_buf;
+            pivot_buf = proc_buf + pivot_row * width - displacements[proc_rank];
+            check_mem(pivot_buf);
+            check_mem(temp);
         }
-        proc++;
+
+        debug_mpi(proc_rank, "Broadcasting pivot_row %d\
+                from process pivot_proc %d", pivot_row, pivot_proc);
+        MPI_Bcast(pivot_buf, width, MPI_DOUBLE,
+                pivot_proc, MPI_COMM_WORLD);
+
+        int num_rows = send_counts[proc_rank]/width;
+        debug_mpi(proc_rank, "num_rows:  %d",  num_rows);
+        for (int row = 0; row < num_rows; row++)
+        {
+            int global_row = displacements[proc_rank]/width + row;
+            debug_mpi(proc_rank, "pivot_row: %d, global_row: %d", pivot_row, global_row);
+            if (global_row > pivot_row)
+            {
+                debug_mpi(proc_rank,
+                        "Forward elimination using pivot_row %d", pivot_row);
+                check_mem(pivot_buf);
+                double pivot = pivot_buf[pivot_row];
+                check(pivot != 0, "Singular pivot");
+                double leverage = proc_buf[width*row + pivot_row];
+                proc_buf[width * row + pivot_row] = 0.0l;
+                double factor = leverage / pivot;
+                for (int col = pivot_row + 1; col < width; col++)
+                {
+                    int index = row * width + col;
+                    proc_buf[index] -=  pivot_buf[index] * factor;
+                }
+                debug_mpi(proc_rank, "Forward elimination complete");
+            }
+        }
+        pivot_row++; 
+        if (proc_rank == pivot_proc)
+        {
+            pivot_buf = temp;
+            check_mem(pivot_buf);
+            temp = NULL;
+        }
+
+        debug_mpi(proc_rank, "Almost there");
+        if (pivot_proc < num_procs-1) 
+        {
+            if ((pivot_row * width)%(displacements[pivot_proc+1]) ==  0)
+            {
+                pivot_proc++;
+            }
+        }
     }
 
-    free(send_counts);
+    mpi_err = MPI_Gatherv(proc_buf, send_counts[proc_rank],
+            MPI_DOUBLE, M, send_counts,
+            displacements, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    check(!mpi_err, "Gathering to root failed");
+
+    free(pivot_buf);
+    free(proc_buf);
     free(displacements);
-    free(recv_buf);
+    free(send_counts);
     return 0;
 error:
+    if (pivot_buf)
+        free(pivot_buf);
+    if (proc_buf)
+        free(proc_buf);
     if (send_counts)
         free(send_counts);
     if (displacements)
         free(displacements);
-    if (send_buf)
-        free(send_buf);
-    if (recv_buf)
-        free(recv_buf);
     return -1;
 }

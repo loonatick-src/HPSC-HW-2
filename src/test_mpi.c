@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
             if (residue >= threshold)
             {
                 log_warn("At index %d:\
-                    expected %lf, eound %lf", i, elmt, p[i]);
+                    expected %lf, found %lf", i, elmt, p[i]);
 
             }
             else 
@@ -95,8 +95,20 @@ int main(int argc, char *argv[])
         free(m2);
     }
 
-    my_err = gaussian_elimination_naive(p, width, proc_rank, num_procs);
+    my_err = gaussian_elimination_naive_inplace(p, width, proc_rank, num_procs);
 
+    if (proc_rank == 0)
+    {
+        for (int row = 0; row < width; row++)
+        {
+            for (int col = 0; col < width; col++)
+            {
+                printf("%lf ", p[row * width + col]);
+            }
+            putchar('\n');
+        }
+    }
+    
 
     debug_mpi(proc_rank, "Exit success");
     MPI_Finalize();

@@ -70,47 +70,57 @@ int main(int argc, char *argv[])
     mpi_err = MPI_Bcast(&width, 1, MPI_INTEGER, 0, MPI_COMM_WORLD);
     check(!mpi_err, "`MPI_Bcast` returned with error.");
     int mat_size = width * width;
+
+    double start_time = MPI_Wtime();
     int my_err = matmul(m1, m2, p, width, proc_rank, num_procs);
+    double end_time = MPI_Wtime();
     check(!my_err, "Something went wrong during matrix multiplication");
+
+    double execution_time_matmul = end_time - start_time;
 
     if (proc_rank == 0) {
         for (int i = 0; i < mat_size; i++)
         {
             double elmt;
-            scanf("%lf", &elmt);
+            int scan_rv = scanf("%lf", &elmt);
+            check(scan_rv != EOF, "Unexpected EOF while reading matrix");
+            check(scan_rv > 0, "Nothing was scanned");
             double residue = elmt - p[i];
-            if (residue >= threshold)
-            {
-                log_warn("At index %d:\
-                    expected %lf, found %lf", i, elmt, p[i]);
-
-            }
-            else 
-            {
-                log_info("%d: Ye", i);
-            }
+            check(residue < threshold, "Bad numericals\
+                    - matrix multiplication test case failed");
         }
-
         free(m1);
         free(m2);
     }
 
+    start_time = MPI_Wtime();
     my_err = gaussian_elimination_naive_inplace(p, width, proc_rank, num_procs);
+    end_time = MPI_Wtime();
+    check(!my_err, "Error during gaussian elimination");
+    double execution_time_elimination = end_time - start_time;
 
+    //if (proc_rank == 0)
+    //{
+     //   for (int row = 0; row < width; row++)
+      //  {
+       //     for (int col = 0; col < width; col++)
+        //    {
+         //       printf("%lf ", p[row * width + col]);
+          //  }
+           // putchar('\n');
+       // }
+   //}
+
+    // width num_procs matmul_time elim_time
     if (proc_rank == 0)
     {
-        for (int row = 0; row < width; row++)
-        {
-            for (int col = 0; col < width; col++)
-            {
-                printf("%lf ", p[row * width + col]);
-            }
-            putchar('\n');
-        }
+        printf("%d %d %lf %lf", width, num_procs, 
+                execution_time_matmul,
+                execution_time_elimination); 
     }
-    
-
     debug_mpi(proc_rank, "Exit success");
+    if (p)
+        free(p);
     MPI_Finalize();
     return EXIT_SUCCESS; 
 error:

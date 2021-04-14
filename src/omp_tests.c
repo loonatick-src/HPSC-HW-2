@@ -9,6 +9,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 
+#define THRESHOLD 0.01l
 implementation_t omp_matmul_methods[] = {matMulSquare_baseline_omp,
                                 matMulSquare_transpose_omp,
                                 matMulSquare_pretranspose_omp};
@@ -17,15 +18,26 @@ implementation_t omp_matmul_methods[] = {matMulSquare_baseline_omp,
 const int num_methods_omp = sizeof(omp_matmul_methods)/sizeof(implementation_t);
 
 
+static
+inline
+double percent_error(double of, double against)
+{
+    return fabs(of - against)/against * 100;
+}
+
+
 int main(int argc, char *argv[])
 {
     double *m1 = NULL, *m2 = NULL, *p = NULL;
     int widthi, method_index = 1;  // default method_index (transpose)
     
     implementation_t matmul = omp_matmul_methods[method_index];
-    omp_set_num_threads(6);
+    int num_threads = omp_get_max_threads();
 
-    scanf("%d", &widthi); 
+    int scan_rv = scanf("%d", &widthi); 
+    check(scan_rv != EOF, "Unexpected EOF");
+    check(scan_rv > 0, "Nothing was scanned");
+
     const int mat_size = widthi * widthi;
     const int mem_size = mat_size * sizeof(double);
     m1 = (double *)malloc(mem_size);
@@ -53,26 +65,34 @@ int main(int argc, char *argv[])
     }
 
     p = (double *)malloc(width * width * sizeof(double));
+    double start_time = omp_get_wtime();
     my_err = matmul(m1, m2, p, width);
+    double end_time = omp_get_wtime();
     check(!my_err, "Something went wrong during matrix multiplication");
-
+    double execution_time_matmul = end_time - start_time;
     free(m1);  
     free(m2);
 
-    for (int i = 0; i < width * width; i++)
+    for (uint32_t i = 0; i < width * width; i++)
     {
-        double elmt; scanf("%lf", &elmt);
-        if (fabs(elmt - p[i])/elmt > 0.01)
-        {
-            log_warn("Bad numericals: expected %lf, found %lf", elmt, p[i]);
-        }
+        double elmt; 
+
+        scan_rv = scanf("%lf", &elmt);
+        check(scan_rv != EOF, "Unexpected EOF");
+        check(scan_rv > 0, "Nothing was scanned");
+        double prcnt_err = percent_error(p[i], elmt);
+        check(prcnt_err < THRESHOLD, "Bad numericals -\
+                matrix multiplication test case failed");
     }
     debug("Matrix multiplication complete");
     
-    /*
-    my_err = gaussian_elimination_naive_inplace(p, width);
+    start_time = omp_get_wtime();
+    my_err = gaussian_elimination_naive_inplace_omp(p, width);
+    end_time = omp_get_wtime();
     check(!my_err, "Something went wrong during gaussian elimination");
+    double execution_time_elimination = end_time - start_time;
 
+    /*
     for (int row = 0; row < width; row++)
     {
         for (int col = 0; col < width; col++)
@@ -81,9 +101,12 @@ int main(int argc, char *argv[])
         }
         putchar('\n');
     }
-
     */
+
     debug("Testing complete");
+    // width num_threads matmul_time elimination_time
+    printf("%u %d %lf %lf\n", width, num_threads,
+            execution_time_matmul, execution_time_elimination);
     free(p);
     return 0;
 error:

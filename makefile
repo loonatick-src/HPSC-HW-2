@@ -1,11 +1,8 @@
-CFLAGS = -Wall -Wextra -Winline -pedantic -g -Iinclude
-LDLIBS = -lm
-
-mpi: CFLAGS = -Wall -Wextra -Winline -pedantic -g -Iinclude
+mpi: CFLAGS = -Wall -Wextra -pedantic -O2 -Iinclude -DNDEBUG
 mpi:
-	mpicc $(CFLAGS) src/impl_mpi.c src/test_mpi.c -o bin/mpi.out $(LDLIBS)
+	mpicc $(CFLAGS) src/impl_mpi.c src/mpi_tests.c -lm -o bin/mpi.out 
 
-omp: CFLAGS = -Wall -Winline -pedantic -g -Iinclude -fopenmp
+omp: CFLAGS = -fopenmp -Wall -Wextra -pedantic -O2 -Iinclude -DNDEBUG
 omp:
-	gcc $(CFLAGS) src/impl_omp.c src/test_omp.c -o bin/omp.out $(LDLIBS)
+	gcc $(CFLAGS) src/impl_omp.c src/omp_tests.c -lm -o bin/omp.out
 

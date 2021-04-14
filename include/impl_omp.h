@@ -18,6 +18,6 @@ matMulSquare_transpose_omp(ARGUMENT_SIGNATURE_OMP);
 int
 matMulSquare_pretranspose_omp(ARGUMENT_SIGNATURE_OMP);
 
-int gaussian_elimination_naive_inplace(double *M, uint32_t width);
+int gaussian_elimination_naive_inplace_omp(double *M, uint32_t width);
 
 #endif

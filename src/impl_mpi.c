@@ -401,10 +401,10 @@ int
 gaussian_elimination_naive_inplace(double *M, /*double *P,*/ int width,
         int proc_rank, int num_procs)
 {
-    if (proc_rank == 0)
-        check_mem(M);
     double *pivot_buf = NULL, *proc_buf = NULL;
     int *send_counts = NULL, *displacements = NULL;
+    if (proc_rank == 0)
+        check_mem(M);
 
     send_counts = (int *) malloc(sizeof(int) * num_procs);
     check_mem(send_counts);

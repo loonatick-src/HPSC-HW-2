@@ -113,12 +113,14 @@ matMulSquare_balanced_mpi(const double *M_1, double *M_2,
         double *P, int width,
         int proc_rank, int num_procs)
 {
+    int mpi_err;
     const int mat_size = width * width;
     int num_rows_per_proc = width / num_procs;
     int unbalanced_num_rows = width - (num_rows_per_proc * num_procs);
     if (proc_rank == 0)
     {
         check_mem(M_1); check_mem(M_2); check_mem(P);
+        debug("mem_check'd");
     }
     check(num_rows_per_proc > 0, "Poorly balanced problem: (%d rows, %d processes)", width, num_procs);
 
@@ -131,6 +133,7 @@ matMulSquare_balanced_mpi(const double *M_1, double *M_2,
         check_mem(M_2);
     }
 
+    debug("Broadcasting M2");
     MPI_Bcast(M_2, mat_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     // send_counts for scatter_v
@@ -151,7 +154,17 @@ matMulSquare_balanced_mpi(const double *M_1, double *M_2,
     }
     send_counts[num_procs-1] = mat_size / num_procs;
 
-
+#ifndef DNDEBUG
+    if (proc_rank == 0)
+    {
+        for (int i = 0; i < num_procs; i++)
+        {
+            debug("send_counts[%d]: %d", i, send_counts[i]);
+            debug("displacements[%d]: %d", i, displacements[i]);
+        }
+    }
+    
+#endif
     double *recv_buf = NULL, *send_buf = NULL;  
     recv_buf = (double *)malloc(send_counts[proc_rank] * sizeof(double));
     check_mem(recv_buf);
@@ -181,9 +194,11 @@ matMulSquare_balanced_mpi(const double *M_1, double *M_2,
         }
     }
 
-    MPI_Gatherv(send_buf, send_counts[proc_rank], MPI_DOUBLE,
+    debug_mpi(proc_rank,"Gathering into P");
+    mpi_err = MPI_Gatherv(send_buf, send_counts[proc_rank], MPI_DOUBLE,
             P, send_counts, displacements, MPI_DOUBLE,
             0, MPI_COMM_WORLD);
+    check(!mpi_err, "MPI_Gatherv returned with error");
 
     free(send_buf);
     free(recv_buf);
@@ -193,8 +208,9 @@ matMulSquare_balanced_mpi(const double *M_1, double *M_2,
     {
         free(M_2);
     }
+    debug_mpi(proc_rank,"All memory resources freed");
 
-    return EXIT_SUCCESS;
+    return 0;
 error:
     if (proc_rank != 0 && M_2)
         free(M_2);
@@ -398,13 +414,16 @@ error:
 
 
 int
-gaussian_elimination_naive_inplace(double *M, /*double *P,*/ int width,
+gaussian_elimination_naive_inplace_mpi(double *M, /*double *P,*/ int width,
         int proc_rank, int num_procs)
 {
     double *pivot_buf = NULL, *proc_buf = NULL;
     int *send_counts = NULL, *displacements = NULL;
     if (proc_rank == 0)
+    {
         check_mem(M);
+        debug("mem_check'd");
+    }
 
     send_counts = (int *) malloc(sizeof(int) * num_procs);
     check_mem(send_counts);
@@ -426,6 +445,13 @@ gaussian_elimination_naive_inplace(double *M, /*double *P,*/ int width,
         displacements[i+1] = displacements[i] + send_counts[i];
     }
     send_counts[num_procs-1] = rows_per_proc * width;
+#   ifndef DNDEBUG
+    for (int i = 0; i < num_procs; i++)
+    {
+        debug("send_counts[%d]: %d", i, send_counts[i]);
+        debug("displacements[%d]: %d", i, displacements[i]);
+    }
+#   endif
 
     pivot_buf = (double *) malloc(width * sizeof(double));
     check_mem(pivot_buf);
@@ -437,6 +463,7 @@ gaussian_elimination_naive_inplace(double *M, /*double *P,*/ int width,
             MPI_DOUBLE, proc_buf, send_counts[proc_rank],
             MPI_DOUBLE, 0, MPI_COMM_WORLD);
     check(!mpi_err, "Call to `MPI_Scatterv` returned with error");
+    debug_mpi(proc_rank, "Scattered!");
 
     // iterating over rows of the matrix
     // each row except the last becomes the pivot row
@@ -452,6 +479,7 @@ gaussian_elimination_naive_inplace(double *M, /*double *P,*/ int width,
             check_mem(temp);
         }
 
+        debug_mpi(proc_rank, "Broadcasting pivot row %d from process %d", pivot_row, pivot_proc);
         MPI_Bcast(pivot_buf, width, MPI_DOUBLE,
                 pivot_proc, MPI_COMM_WORLD);
 
@@ -491,6 +519,7 @@ gaussian_elimination_naive_inplace(double *M, /*double *P,*/ int width,
         }
     }
 
+    debug_mpi(proc_rank, "Gathering into main matrix");
     mpi_err = MPI_Gatherv(proc_buf, send_counts[proc_rank],
             MPI_DOUBLE, M, send_counts,
             displacements, MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -500,6 +529,7 @@ gaussian_elimination_naive_inplace(double *M, /*double *P,*/ int width,
     free(proc_buf);
     free(displacements);
     free(send_counts);
+    debug("Intermediate memory resources freed");
     return 0;
 error:
     if (pivot_buf)

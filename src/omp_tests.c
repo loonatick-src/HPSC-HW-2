@@ -9,14 +9,15 @@
 #include <inttypes.h>
 #include <stdlib.h>
 
-#define THRESHOLD 0.01l
-implementation_t omp_matmul_methods[] = {matMulSquare_baseline_omp,
+
+impl_omp_t omp_matmul_methods[] = {matMulSquare_baseline_omp,
                                 matMulSquare_transpose_omp,
                                 matMulSquare_pretranspose_omp};
 
 
-const int num_methods_omp = sizeof(omp_matmul_methods)/sizeof(implementation_t);
+const int num_methods_omp = sizeof(omp_matmul_methods)/sizeof(impl_omp_t);
 
+const double THRESHOLD = 0.01l;
 
 static
 inline
@@ -31,7 +32,7 @@ int main(int argc, char *argv[])
     double *m1 = NULL, *m2 = NULL, *p = NULL;
     int widthi, method_index = 1;  // default method_index (transpose)
     
-    implementation_t matmul = omp_matmul_methods[method_index];
+    impl_omp_t matmul = omp_matmul_methods[method_index];
     int num_threads = omp_get_max_threads();
 
     int scan_rv = scanf("%d", &widthi); 

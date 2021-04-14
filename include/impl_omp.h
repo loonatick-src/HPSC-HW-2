@@ -6,7 +6,7 @@
 #define ARGUMENT_SIGNATURE_OMP const double *M_1, const double *M_2, double *P, uint32_t width
 
 
-typedef int (*implementation_t)(ARGUMENT_SIGNATURE_OMP);
+typedef int (*impl_omp_t)(ARGUMENT_SIGNATURE_OMP);
 
 
 int

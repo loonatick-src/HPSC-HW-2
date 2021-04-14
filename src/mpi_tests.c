@@ -10,12 +10,12 @@
 
 const double threshold = 0.01;
 
-implementation_t matmul_methods_mpi[] = {matMulSquare_baseline_mpi,
+impl_mpi_t matmul_methods_mpi[] = {
                               matMulSquare_balanced_mpi,
                               matMulSquare_transpose_mpi,
                               matMulSquare_pretranspose_mpi};
 
-const int num_methods_mpi = sizeof(matmul_methods_mpi)/sizeof(implementation_t);
+const int num_methods_mpi = sizeof(matmul_methods_mpi)/sizeof(impl_mpi_t);
 
 int main(int argc, char *argv[])
 {
@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
     int width, proc_rank, num_procs;
     int mpi_err, mpi_init_flag;
     int method_index = 0;  // defaults to baseline
-    implementation_t matmul;
+    impl_mpi_t matmul;
     mpi_err = MPI_Init(&argc, &argv);
     check(!mpi_err, "MPI failed to initialize.");
 
@@ -41,6 +41,10 @@ int main(int argc, char *argv[])
             method_index = 0;
         }
     }
+
+    mpi_err = MPI_Bcast(&method_index, 1, MPI_INTEGER, 0, MPI_COMM_WORLD);
+    check(!mpi_err, "Call to MPI_Bcast returned with error");
+    debug_mpi(proc_rank,"Method_index: %d", method_index);
     matmul = matmul_methods_mpi[method_index];
 
     if (proc_rank == 0)
@@ -65,16 +69,19 @@ int main(int argc, char *argv[])
             check(scan_count != EOF, "Unexpected EOF");
             check(scan_count > 0, "Nothing scanned");
         }
+        debug("matrix read complete");
     }
 
     mpi_err = MPI_Bcast(&width, 1, MPI_INTEGER, 0, MPI_COMM_WORLD);
     check(!mpi_err, "`MPI_Bcast` returned with error.");
     int mat_size = width * width;
 
+    debug_mpi(proc_rank,"Performing matmul");
     double start_time = MPI_Wtime();
     int my_err = matmul(m1, m2, p, width, proc_rank, num_procs);
     double end_time = MPI_Wtime();
     check(!my_err, "Something went wrong during matrix multiplication");
+    debug_mpi(proc_rank, "Returned from matmul");
 
     double execution_time_matmul = end_time - start_time;
 
@@ -92,11 +99,13 @@ int main(int argc, char *argv[])
         free(m1);
         free(m2);
     }
+    debug_mpi(proc_rank, "m1 and m2 freed");
 
     start_time = MPI_Wtime();
-    my_err = gaussian_elimination_naive_inplace(p, width, proc_rank, num_procs);
+    my_err = gaussian_elimination_naive_inplace_mpi(p, width, proc_rank, num_procs);
     end_time = MPI_Wtime();
     check(!my_err, "Error during gaussian elimination");
+    debug("returned from gaussian elimination");
     double execution_time_elimination = end_time - start_time;
 
     //if (proc_rank == 0)
@@ -114,7 +123,7 @@ int main(int argc, char *argv[])
     // width num_procs matmul_time elim_time
     if (proc_rank == 0)
     {
-        printf("%d %d %lf %lf", width, num_procs, 
+        printf("%d %d %lf %lf\n", width, num_procs, 
                 execution_time_matmul,
                 execution_time_elimination); 
     }

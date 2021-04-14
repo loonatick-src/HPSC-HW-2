@@ -21,6 +21,10 @@ matMulSquare_pretranspose_mpi(ARGUMENT_SIGNATURE);
 int
 matMulSquare_balanced_mpi(ARGUMENT_SIGNATURE);
 
+int
+gaussian_elimination_naive_inplace(double *M, int width,
+        int proc_rank, int num_procs);
+
 /*
 int
 gaussian_elimination_naive(double *M, int width,

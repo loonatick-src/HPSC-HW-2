@@ -148,17 +148,8 @@ matMulSquare_balanced_mpi(const double *M_1, double *M_2,
             unbalanced_num_rows--;
         }
         displacements[i+1] = displacements[i] + send_counts[i];
-        if (proc_rank == 0)
-        {
-            debug("send_counts[%d] = %d, displacements[%d] = %d", i, send_counts[i], i, displacements[i]);
-        }
-
     }
     send_counts[num_procs-1] = mat_size / num_procs;
-    if (proc_rank == 0)
-    {
-        debug("send_counts[%d] = %d", num_procs - 1, send_counts[proc_rank]);
-    }
 
 
     double *recv_buf = NULL, *send_buf = NULL;  
@@ -414,7 +405,6 @@ gaussian_elimination_naive_inplace(double *M, /*double *P,*/ int width,
         check_mem(M);
     double *pivot_buf = NULL, *proc_buf = NULL;
     int *send_counts = NULL, *displacements = NULL;
-    debug_proc(0, "Commencing gaussian elimination");
 
     send_counts = (int *) malloc(sizeof(int) * num_procs);
     check_mem(send_counts);
@@ -462,21 +452,15 @@ gaussian_elimination_naive_inplace(double *M, /*double *P,*/ int width,
             check_mem(temp);
         }
 
-        debug_mpi(proc_rank, "Broadcasting pivot_row %d\
-                from process pivot_proc %d", pivot_row, pivot_proc);
         MPI_Bcast(pivot_buf, width, MPI_DOUBLE,
                 pivot_proc, MPI_COMM_WORLD);
 
         int num_rows = send_counts[proc_rank]/width;
-        debug_mpi(proc_rank, "num_rows:  %d",  num_rows);
         for (int row = 0; row < num_rows; row++)
         {
             int global_row = displacements[proc_rank]/width + row;
-            debug_mpi(proc_rank, "pivot_row: %d, global_row: %d", pivot_row, global_row);
             if (global_row > pivot_row)
             {
-                debug_mpi(proc_rank,
-                        "Forward elimination using pivot_row %d", pivot_row);
                 check_mem(pivot_buf);
                 double pivot = pivot_buf[pivot_row];
                 check(pivot != 0, "Singular pivot");
@@ -488,7 +472,6 @@ gaussian_elimination_naive_inplace(double *M, /*double *P,*/ int width,
                     int index = row * width + col;
                     proc_buf[index] -=  pivot_buf[index] * factor;
                 }
-                debug_mpi(proc_rank, "Forward elimination complete");
             }
         }
         pivot_row++; 
@@ -499,7 +482,6 @@ gaussian_elimination_naive_inplace(double *M, /*double *P,*/ int width,
             temp = NULL;
         }
 
-        debug_mpi(proc_rank, "Almost there");
         if (pivot_proc < num_procs-1) 
         {
             if ((pivot_row * width)%(displacements[pivot_proc+1]) ==  0)
